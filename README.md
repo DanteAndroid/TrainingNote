@@ -179,3 +179,165 @@ protected void onCreate(Bundle savedInstanceState) {
 相比onCreate，你可能会选`onRestoreInstanceState()`，它在`onStart()`后被调用。仅当有保存的state可以恢复的时候，该方法才被调用。所以不用检查Bundle是否为null。
 
 ###Building a Dynamic UI with Fragments
+>To create a dynamic and multi-pane user interface on Android, you need to encapsulate UI components and activity behaviors into modules that you can swap into and out of your activities. You can create these modules with the Fragment class, which behaves somewhat like a nested activity that can define its own layout and manage its own lifecycle.
+为了创建动态的、多面板的UI，你需要封装UI控件和activity行为成模块，这样可以包进你的activity(swap into and out of your activities)。
+你可以用Fragment类来创建这些模块，它就像一个嵌套的activity一样，可以有自己的布局和生命周期。你可以把Fragment看做模块化的activity。有自己的布局、生命周期、输入事件，还能在activity运行时动态添加、移除。（有点像你可以在不同activity中复用的子activity）
+
+由于fragment是可复用的、模块化的UI组件，每个实例都必须与父Activity相关联。你可以通过在布局文件中定义fragment来实现这种关联。示例：
+```
+res/layout-large/news_articles.xml
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="horizontal"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent">
+
+    <fragment android:name="com.example.android.fragments.HeadlinesFragment"
+              android:id="@+id/headlines_fragment"
+              android:layout_weight="1"
+              android:layout_width="0dp"
+              android:layout_height="match_parent" />
+
+    <fragment android:name="com.example.android.fragments.ArticleFragment"
+              android:id="@+id/article_fragment"
+              android:layout_weight="2"
+              android:layout_width="0dp"
+              android:layout_height="match_parent" />
+
+</LinearLayout>
+```
+注意，当你在activity的布局文件中定义fragment时，是无法运行时移除的。
+为了能动态添加或移除Fragment，你得用FragmentManager来创建FragmentTransaction。动态处理Fragment时有一点很重要————你的activity布局必须包含一个container View作为你插入fragment的容器。
+```
+res/layout/news_articles.xml:
+
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/fragment_container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent" />
+```
+注意相比上节中的布局，这个layout没有-large的后缀，也就是用在默认的小尺寸的屏幕上。下面是activity中动态添加fragment的代码(※重要※)：
+```
+@Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.news_articles);
+
+        // Check that the activity is using the layout version with
+        // the fragment_container FrameLayout
+        //检查activity是否是含有container（如果是，说明需要动态添加）
+        if (findViewById(R.id.fragment_container) != null) {
+
+            // However, if we're being restored from a previous state,
+            // then we don't need to do anything and should return or else
+            // we could end up with overlapping fragments.
+            //**如果是从之前状态恢复的，并不需要做什么，否则可能会出现fragment重叠**
+            if (savedInstanceState != null) {
+                return;
+            }
+
+            // Create a new Fragment to be placed in the activity layout
+            HeadlinesFragment firstFragment = new HeadlinesFragment();
+            
+            // In case this activity was started with special instructions from an
+            // Intent, pass the Intent's extras to the fragment as arguments
+            //**以防activity被含有特别指示的Intent启动的，把activity的Intent中的extras设为Fragment的arguments**
+            firstFragment.setArguments(getIntent().getExtras());
+            
+            // Add the fragment to the 'fragment_container' FrameLayout
+            getSupportFragmentManager().beginTransaction()
+                    .add(R.id.fragment_container, firstFragment).commit();
+        }
+    }
+```
+>Keep in mind that when you perform fragment transactions, such as replace or remove one, it's often appropriate to allow the user to navigate backward and "undo" the change. 
+请记住，当你执行fragment事务比如replace或者remove时，允许用户能回到之前的状态并"撤销"改变通常是合适的。当你执行这些操作，并`addToBackStack()`时，被remove的fragment实际上是处于stopped状态而非destroyed。如果用户返回并恢复之前的fragment，它会重新启动(restarts)。如果你不加到back stack，那么被remove或replace的fragment就会被销毁。
+`addToBackStack()`有一个可选的String参数，给这个transaction指定了独一无二的名字。这个名字没什么卵用，除非你打算用fragment操作中的FragmentManager.BackStackEntry里的API。
+
+所有的Fragment之间的通讯都应该通过相连接的activity来完成，俩fragment绝不应该直接交流。Fragment和activity通讯示例：
+```
+public class HeadlinesFragment extends ListFragment {
+    OnHeadlineSelectedListener mCallback;
+
+    // Container Activity must implement this interface
+    public interface OnHeadlineSelectedListener {
+        public void onArticleSelected(int position);
+    }
+
+    @Override
+    public void onAttach(Activity activity) {
+        super.onAttach(activity);
+        
+        // This makes sure that the container activity has implemented
+        // the callback interface. If not, it throws an exception
+        try {
+            mCallback = (OnHeadlineSelectedListener) activity;
+        } catch (ClassCastException e) {
+            throw new ClassCastException(activity.toString()
+                    + " must implement OnHeadlineSelectedListener");
+        }
+    }
+    
+    ...
+}
+//Use the callback interface to deliver the event to the parent activity.
+    @Override
+    public void onListItemClick(ListView l, View v, int position, long id) {
+        // Send the event to the host activity
+        mCallback.onArticleSelected(position);
+    }
+
+```
+```
+public static class MainActivity extends Activity
+        implements HeadlinesFragment.OnHeadlineSelectedListener{
+    ...
+    
+    public void onArticleSelected(int position) {
+        // The user selected the headline of an article from the HeadlinesFragment
+        // Do something here to display that article
+    }
+}
+```
+
+宿主activity（host activity）可以通过`findFragmentById()`来找到fragment实例，然后直接调用其public方法，以实现发消息给fragment。
+例如，上面举得例子中activity可能包含另外一个fragment，通过回调中返回的数据来让该fragment显示相应的item：
+```
+public static class MainActivity extends Activity
+        implements HeadlinesFragment.OnHeadlineSelectedListener{
+    ...
+
+    public void onArticleSelected(int position) {
+        // The user selected the headline of an article from the HeadlinesFragment
+        // Do something here to display that article
+
+        ArticleFragment articleFrag = (ArticleFragment)
+                getSupportFragmentManager().findFragmentById(R.id.article_fragment);
+
+        if (articleFrag != null) {
+            // If article frag is available, we're in two-pane layout...
+            // Call a method in the ArticleFragment to update its content
+            //如果能找到详情fragment，说明在双面板的布局中，直接调用其更新方法
+            articleFrag.updateArticleView(position);
+        } else {
+            // Otherwise, we're in the one-pane layout and must swap frags...
+            // Create fragment and give it an argument for the selected article
+            //否则，就是在单面板布局中，需要replace相应的fragment。
+            ArticleFragment newFragment = new ArticleFragment();
+            Bundle args = new Bundle();
+            args.putInt(ArticleFragment.ARG_POSITION, position);
+            newFragment.setArguments(args);
+        
+            FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
+
+            // Replace whatever is in the fragment_container view with this fragment,
+            // and add the transaction to the back stack so the user can navigate back
+            //无论container中是啥，都应该replace掉，并且加到back stack这样用户可以返回。
+            transaction.replace(R.id.fragment_container, newFragment);
+            transaction.addToBackStack(null);
+
+            // Commit the transaction
+            transaction.commit();
+        }
+    }
+}
+```
