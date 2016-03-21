@@ -31,21 +31,101 @@ Activity只能在三种状态下停留较长时间：
 - Resumed ————Activity在前台，用户可以交互，又叫做运行状态。
 - Paused ————Activity被另一个在前台的，半透明或者没有覆盖整个屏幕的activity遮挡，暂停状态的activity不接受用户的输入，**不执行任何代码**
 - Stoped ————Activity完全隐藏，可以认为进入后台了。停止状态下，activity的实例和状态信息比如成员变量还保留，同Paused一样**不执行任何代码**
-其他状态都是非常短暂的，比如`onCreate()`调用后就会立刻`onStart()`,然后快速地跟着`onResume()`.
+其他状态都是非常短暂的，比如onCreate调用后就会立刻onStart,然后快速地跟着`onResume.
 
 如果MAIN action或者LAUNCHER category没有定义在你的主activity中，你的app图标就不会在抽屉里显示。
 
-You must implement the `onCreate()` method to perform basic application startup logic that should happen only
-once for the entire life of the activity. For example, your implementation of `onCreate()` should define the user interface
+You must implement the onCreate method to perform basic application startup logic that should happen only
+once for the entire life of the activity. For example, your implementation of `onCreate should define the user interface
 and possibly instantiate some class-scope variables.
 
-你必须实现`onCreate()`方法来处理一些应用基本的初始化逻辑，它只在activity的整个生命周期中执行一次。比如，定义UI，初始化一些类级别的变量。`onCreate()`
-执行完成后，`onStart()`和`onResume()`会立刻紧接着被执行，然后activity会停留在`onResume`，直到发生改变状态的事件，比如接电话，
+你必须实现onCreate方法来处理一些应用基本的初始化逻辑，它只在activity的整个生命周期中执行一次。比如，定义UI，初始化一些类级别的变量。onCreate
+执行完成后，onStart和onResume会立刻紧接着被执行，然后activity会停留在onResume，直到发生改变状态的事件，比如接电话，
 或者跳到别的activity、屏幕关闭。
 
-相对于生命周期的第一个回调是`onCreate()`，最后一个被调用的是`onDestroy()`。系统调用它作为你activity实例被完全从内存中移除的标志。大部分app
-不需要实现这个方法，因为本地引用（local class references）和activity一同被销毁，而你的activity应当在`onPause()`和`onStop()`中做大部分清理工作。
-然而，如果你的activity在`onCreate()`中创建了后台线程，或者其他长时间运行的资源，如果没有恰当关闭会造成内存泄露的话，你应该在`onDestroy()`中干掉他们。
+相对于生命周期的第一个回调是onCreate，最后一个被调用的是onDestroy。系统调用它作为你activity实例被完全从内存中移除的标志。大部分app
+不需要实现这个方法，因为本地引用（local class references）和activity一同被销毁，而你的activity应当在onPause和onStop中做大部分清理工作。
+然而，如果你的activity在onCreate中创建了后台线程，或者其他长时间运行的资源，如果没有恰当关闭会造成内存泄露的话，你应该在onDestroy中干掉他们。
 
-系统会在已经调用了`onPause()`和`onStop()`后才调用`onDestroy()`，只有一个种情况例外：在`onCreate()`中调`finish()`，某些情况，你的activity可能会临时决定启动
-另一个activity，那么你也许会在`onCreate()`中调`finish()`，这种情况，系统会立刻调用`onDestroy()`而不调用其他生命周期方法。
+系统会在已经调用了onPause和onStop后才调用onDestroy，只有一个种情况例外：在onCreate中调finish，某些情况，你的activity可能会临时决定启动
+另一个activity，那么你也许会在onCreate中调finish，这种情况，系统会立刻调用onDestroy而不调用其他生命周期方法。
+
+As your activity enters the paused state, the system calls the onPause() method on your Activity, which allows you to stop ongoing actions that should not continue while paused (such as a video) or persist any information that should be permanently saved
+in case the user continues to leave your app. If the user returns to your activity from the paused state, the system resumes
+it and calls the onResume() method.
+
+当你activity进入暂停状态时，系统会调用onPause，在这里你可以停止一些在暂停状态不该继续执行的操作，比如视频播放，或者保存应当永久性保存
+的数据，防止用户接下来想离开你的app。如果用户从paused状态回到你的activity，系统会恢复并调用onResume()。
+注意，通常情况下，进入onPause都是用户要离开你activity的第一个标志(first indication)。
+在onPause()中，你通常需要：
+- 停止消耗cpu的操作，比如动画
+- 保存没保存的改变（仅当这些改变是用户离开时需要保存的东西时，比如编写email）。
+- 释放系统资源，比如broadcast receiver，处理GPS之类的传感器，或者其他任何在activity暂停状态下，你的用户不需要的但是可能会耗电的东西
+比如如果你的app使用到Camera，onPause()就是很好的释放它的地方。
+```
+@Override
+public void onPause() {
+    super.onPause();  // Always call the superclass method first
+
+    // Release the Camera because we don't need it when paused
+    // and other activities might need to use it.
+    if (mCamera != null) {
+        mCamera.release();
+        mCamera = null;
+    }
+}
+```
+Generally, you should not use onPause() to store user changes (such as personal information entered into a form) to permanent storage. The only time you should persist user changes to permanent storage within onPause() is when you're certain users expect the changes to be auto-saved (such as when drafting an email). However, you should avoid performing CPU-intensive work during onPause(), such as writing to a database, because it can slow the visible transition to the next activity (you should instead perform heavy-load shutdown operations during onStop()).
+You should keep the amount of operations done in the onPause() method relatively simple in order to allow for a speedy transition to the user's next destination if your activity is actually being stopped.
+
+Note: When your activity is paused, the Activity instance is kept resident in memory and is recalled when the activity resumes. You don’t need to re-initialize components that were created during any of the callback methods leading up to the Resumed state.
+通常情况下，你不需要在onPause中永久性存储用户的改变，比如在表格中输入个人信息。唯一你需要永久性保存的情况就是你确定用户离开的时候想要这些东西自动保存（比如写邮件）。但是，你在onPause中应该避免剧烈消耗cpu的操作，比如写入数据库，因为这会影响到转移到下一个activity的效果（你可以在onStop中执行高负载的操作）。为了能流畅的转移到下个目的地，你应该保持onPause中的操作相对简单。注意：你不需要重新初始化你在任何通往Resumed状态的生命周期中创建的控件。
+
+需要留意的是，activity每次进入前台，系统都会调用onResume()方法，包括第一次创建的时候。因此你可以复写它来初始化你在onPause中释放的组件，执行其他每次activity进入Resumed状态时必须的操作，比如开始动画，或者只有有焦点时才需要初始化的控件。
+```
+@Override
+public void onResume() {
+    super.onResume();  // Always call the superclass method first
+    //这段对应的是刚刚onPause中的代码
+    // Get the Camera instance as the activity achieves full user focus
+    if (mCamera == null) {
+        initializeCamera(); // Local method to handle camera init
+    }
+}
+```
+
+处理好停止和重新开始你的activity是生命周期中很重要的过程，可以确保用户意识到你的app还活着，并不会丢失进度。有一些你activity会stoped或者restarted的场景：
+- 用户打开最近任务，切换到其他app。如果用户通过最近任务或者桌面图标回到app，activity就会restarts。
+- 用户在app中打开了新的activity。如果用户按下返回，前一个activity就会被restarted。
+- 用户接到电话。
+
+因为在stopped状态，系统内存中还保留了activity实例，所以可能你并不需要实现onStop()、onRestart()甚至是onStart()。对于大部分简单的
+activity来说，activity会正常stop和restart，你可能只需要在onPause中暂停下正在进行的操作，释放系统资源罢了。
+你不需要重新初始化那些在通往Resumed状态中创建的控件。系统始终追踪了layout中每个view的状态，所以如果用户在edittext中输入了内容，那么
+内容会被保留，所以你不需要去保存然后恢复。
+极端情况下，当你的activity处于stopped状态时，系统会直接销毁activity而不调用onDestroy。尽管如此，系统还是会保留view对象的状态在Bundle中
+并在用户导航到该activity时恢复他们。
+
+app使用onRestart来恢复状态并不常见，所以关于这个方法没有什么建议可说的（那你还搞这个方法干嘛- -）。但是捏，因为你app应当在onStop中清理
+所有资源，你应该需要在activity重新启动的时候重新初始化这些资源。此外，你的activity第一次创建也需要初始化他们，因此
+onStart()就是个初始化他们的好地方了。比如，用户可能会立刻你app很长时间，那么onStart中就可以验证需要的功能是启用状态：
+```
+@Override
+protected void onStart() {
+    super.onStart();  // Always call the superclass method first
+    
+    // The activity is either being restarted or started for the first time
+    // so this is where we should make sure that GPS is enabled
+    LocationManager locationManager = 
+            (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+    boolean gpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+    
+    if (!gpsEnabled) {
+        // Create a dialog here that requests the user to enable GPS, and use an intent
+        // with the android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS action
+        // to take the user to the Settings screen to enable GPS when they click "OK"
+    }
+}
+```
+因为通常你在onStop()中就已经清理了大部分资源，所以onDestory()中通常没太多需要处理的。确保额外的线程在这里被销魂
+，其他长时间操作比如method tracing也应该停止。
