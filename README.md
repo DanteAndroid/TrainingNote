@@ -2,7 +2,7 @@
 ---
 ##Getting started
 ###Supporting Different Screens
-Android automatically scales your layout in order to properly fit the screen. Thus, your layouts for
+>Android automatically scales your layout in order to properly fit the screen. Thus, your layouts for
 different screen sizes don't need to worry about the absolute size of UI elements but instead focus on the 
 layout stucture that affects the user experience (such as the size or position of important views relative
 to sibling views).
@@ -26,7 +26,8 @@ to sibling views).
 - hdpi: 1.5         150*150
 - mdpi: 1.0       eg.100*100
 
-Activity can exist in one of only three states for an extended period of time:
+>Activity can exist in one of only three states for an extended period of time:
+
 Activity只能在三种状态下停留较长时间：
 - Resumed ————Activity在前台，用户可以交互，又叫做运行状态。
 - Paused ————Activity被另一个在前台的，半透明或者没有覆盖整个屏幕的activity遮挡，暂停状态的activity不接受用户的输入，**不执行任何代码**
@@ -35,7 +36,7 @@ Activity只能在三种状态下停留较长时间：
 
 如果MAIN action或者LAUNCHER category没有定义在你的主activity中，你的app图标就不会在抽屉里显示。
 
-You must implement the onCreate method to perform basic application startup logic that should happen only
+>You must implement the onCreate method to perform basic application startup logic that should happen only
 once for the entire life of the activity. For example, your implementation of `onCreate should define the user interface
 and possibly instantiate some class-scope variables.
 
@@ -50,7 +51,7 @@ and possibly instantiate some class-scope variables.
 系统会在已经调用了onPause和onStop后才调用onDestroy，只有一个种情况例外：在onCreate中调finish，某些情况，你的activity可能会临时决定启动
 另一个activity，那么你也许会在onCreate中调finish，这种情况，系统会立刻调用onDestroy而不调用其他生命周期方法。
 
-As your activity enters the paused state, the system calls the onPause() method on your Activity, which allows you to stop ongoing actions that should not continue while paused (such as a video) or persist any information that should be permanently saved
+>As your activity enters the paused state, the system calls the onPause() method on your Activity, which allows you to stop ongoing actions that should not continue while paused (such as a video) or persist any information that should be permanently saved
 in case the user continues to leave your app. If the user returns to your activity from the paused state, the system resumes
 it and calls the onResume() method.
 
@@ -75,10 +76,11 @@ public void onPause() {
     }
 }
 ```
-Generally, you should not use onPause() to store user changes (such as personal information entered into a form) to permanent storage. The only time you should persist user changes to permanent storage within onPause() is when you're certain users expect the changes to be auto-saved (such as when drafting an email). However, you should avoid performing CPU-intensive work during onPause(), such as writing to a database, because it can slow the visible transition to the next activity (you should instead perform heavy-load shutdown operations during onStop()).
+>Generally, you should not use onPause() to store user changes (such as personal information entered into a form) to permanent storage. The only time you should persist user changes to permanent storage within onPause() is when you're certain users expect the changes to be auto-saved (such as when drafting an email). However, you should avoid performing CPU-intensive work during onPause(), such as writing to a database, because it can slow the visible transition to the next activity (you should instead perform heavy-load shutdown operations during onStop()).
 You should keep the amount of operations done in the onPause() method relatively simple in order to allow for a speedy transition to the user's next destination if your activity is actually being stopped.
 
-Note: When your activity is paused, the Activity instance is kept resident in memory and is recalled when the activity resumes. You don’t need to re-initialize components that were created during any of the callback methods leading up to the Resumed state.
+>Note: When your activity is paused, the Activity instance is kept resident in memory and is recalled when the activity resumes. You don’t need to re-initialize components that were created during any of the callback methods leading up to the Resumed state.
+
 通常情况下，你不需要在onPause中永久性存储用户的改变，比如在表格中输入个人信息。唯一你需要永久性保存的情况就是你确定用户离开的时候想要这些东西自动保存（比如写邮件）。但是，你在onPause中应该避免剧烈消耗cpu的操作，比如写入数据库，因为这会影响到转移到下一个activity的效果（你可以在onStop中执行高负载的操作）。为了能流畅的转移到下个目的地，你应该保持onPause中的操作相对简单。注意：你不需要重新初始化你在任何通往Resumed状态的生命周期中创建的控件。
 
 需要留意的是，activity每次进入前台，系统都会调用onResume()方法，包括第一次创建的时候。因此你可以复写它来初始化你在onPause中释放的组件，执行其他每次activity进入Resumed状态时必须的操作，比如开始动画，或者只有有焦点时才需要初始化的控件。
@@ -129,3 +131,48 @@ protected void onStart() {
 ```
 因为通常你在onStop()中就已经清理了大部分资源，所以onDestory()中通常没太多需要处理的。确保额外的线程在这里被销魂
 ，其他长时间操作比如method tracing也应该停止。
+
+当你的activity是由于用户按下返回键或者调用finish结束的时候，系统会认为这个activity实例永远消失了，因为这个行为暗示它不在被需要。
+然而，如果是系统由于内存紧张而把这个activity回收了，系统会记住这个activity，并且通过一组数据来保存它销毁时的状态，这样用户回到这activity时，系统就会恢复它的状态。这个之前存储的状态就叫"instance state"，由一个键值对的集合组成，存放在Bundle对象中。
+需要注意，你的activity每次在屏幕旋转时都会被销毁、重建。系统每次在屏幕配置改变时都会这么做是因为，你的activity可能需要
+加载相应的资源。（比如不同的layout）
+默认情况，系统使用Bundle来保存你activity布局中的每个view，比如edittext中的字符，listview的position。所以你不需要写代码来保存、恢复它之前的状态。(为了恢复activity中的views的状态，每个view必须要有一个id。)但是你的activity可能有更多的状态信息需要恢复，比如追踪用户进度的一个成员变量。这时候你可以复写`onSaveInstanceState()`。
+
+>The system calls this method when the user is leaving your activity and passes it the Bundle object that will be saved in the event that your activity is destroyed unexpectedly. If the system must recreate the activity instance later, it passes the same Bundle object to both the onRestoreInstanceState() and onCreate() methods.
+
+当用户离开你的activity时，系统调用该方法，并传入Bundle，如果你的activity被意外销毁，bundle就被保存。之后**系统若是重建该activity，就会传入这个bundle对象到`onCreate()`和`onRestoreInstanceState()`。**
+为了存储额外的信息，你必须复写onSaveInstanceState：
+```
+static final String STATE_SCORE = "playerScore";
+static final String STATE_LEVEL = "playerLevel";
+...
+
+@Override
+public void onSaveInstanceState(Bundle savedInstanceState) {
+    // Save the user's current game state
+    savedInstanceState.putInt(STATE_SCORE, mCurrentScore);
+    savedInstanceState.putInt(STATE_LEVEL, mCurrentLevel);
+    
+    // Always call the superclass so it can save the view hierarchy state
+    super.onSaveInstanceState(savedInstanceState);
+}
+```
+如果之前被销毁了，重建之后你可以在onCreate中恢复activity的状态：
+```
+@Override
+protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState); // Always call the superclass first
+   
+    // Check whether we're recreating a previously destroyed instance
+    if (savedInstanceState != null) {
+        // Restore value of members from saved state
+        mCurrentScore = savedInstanceState.getInt(STATE_SCORE);
+        mCurrentLevel = savedInstanceState.getInt(STATE_LEVEL);
+    } else {
+        // Probably initialize members with default values for a new instance
+    }
+    ...
+}
+```
+相比onCreate，你可能会选`onRestoreInstanceState()`，它在`onStart()`后被调用。仅当有保存的state可以恢复的时候，该方法才被调用。所以不用检查Bundle是否为null。
+
