@@ -341,3 +341,39 @@ public static class MainActivity extends Activity
     }
 }
 ```
+
+你可以用下面的方法，创建一个shared preference文件或者获得已经存在的sp：
+- `getSharedPreferences()` 通过指定文件名，来获得相应的sp。你可以在app中的任何Context下使用该方法
+- `getPreferences()` 在Activity中调用该方法，可以获得此activity专属的sp。不需要指定文件名。
+- `PreferenceManager.getDefaultSharedPreferences()` 包级别的sp。这个实际上返回的就是以`context.getPackageName() + "_preferences"`作为文件名的sp
+目前，所有app不需要指定特殊权限就可以读取外部存储。但是这一点将来会改变。所以为了确保你的app能像预期一样工作，你需要在manifest中添加
+` <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />`
+但是捏，如果你的app使用了WRITE_EXTERNAL_STORAGE权限，那么就默认也具有读取权限了。
+
+内部存储写入文件示例：
+```
+String filename = "myfile";
+String string = "Hello world!";
+FileOutputStream outputStream;
+
+try {
+  outputStream = openFileOutput(filename, Context.MODE_PRIVATE);
+  outputStream.write(string.getBytes());
+  outputStream.close();
+} catch (Exception e) {
+  e.printStackTrace();
+}
+```
+或者，你只需要缓存一些文件，可以用`createTempFile()`，下面的示例演示了从url中提取文件名，并用它在app的内部cache文件夹中创建文件：
+```
+public File getTempFile(Context context, String url) {
+    File file;
+    try {
+        String fileName = Uri.parse(url).getLastPathSegment();
+        file = File.createTempFile(fileName, null, context.getCacheDir());
+    catch (IOException e) {
+        // Error while creating file
+    }
+    return file;
+}
+```
