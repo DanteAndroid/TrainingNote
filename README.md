@@ -7,7 +7,7 @@ different screen sizes don't need to worry about the absolute size of UI element
 layout stucture that affects the user experience (such as the size or position of important views relative
 to sibling views).
 
-系统会自动缩放你的布局以适应屏幕。也就是说，为了适用不同的屏幕尺寸，你不需要担心布局中控件的绝对尺寸，而要关注会影响用户体验的布局结构
+1. 系统会自动缩放你的布局以适应屏幕。也就是说，为了适用不同的屏幕尺寸，你不需要担心布局中控件的绝对尺寸，而要关注会影响用户体验的布局结构
 （比如重要控件相对于sibling views的位置，尺寸）。注：sibling views直译为兄弟view。一个包含默认布局和为大屏幕适配的布局示例：
 ```
     res/
@@ -26,13 +26,15 @@ to sibling views).
 - hdpi: 1.5         150*150
 - mdpi: 1.0       eg.100*100
 
+###Managing the Activity Lifecycle
+
 >Activity can exist in one of only three states for an extended period of time:
 
 Activity只能在三种状态下停留较长时间：
 - Resumed ————Activity在前台，用户可以交互，又叫做运行状态。
 - Paused ————Activity被另一个在前台的，半透明或者没有覆盖整个屏幕的activity遮挡，暂停状态的activity不接受用户的输入，**不执行任何代码**
 - Stoped ————Activity完全隐藏，可以认为进入后台了。停止状态下，activity的实例和状态信息比如成员变量还保留，同Paused一样**不执行任何代码**
-其他状态都是非常短暂的，比如onCreate调用后就会立刻onStart,然后快速地跟着`onResume.
+其他状态都是非常短暂的，比如onCreate调用后就会立刻onStart,然后快速地跟着onResume.
 
 如果MAIN action或者LAUNCHER category没有定义在你的主activity中，你的app图标就不会在抽屉里显示。
 
@@ -176,3 +178,4 @@ protected void onCreate(Bundle savedInstanceState) {
 ```
 相比onCreate，你可能会选`onRestoreInstanceState()`，它在`onStart()`后被调用。仅当有保存的state可以恢复的时候，该方法才被调用。所以不用检查Bundle是否为null。
 
+###Building a Dynamic UI with Fragments
