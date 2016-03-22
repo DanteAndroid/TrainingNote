@@ -554,3 +554,49 @@ protected void onActivityResult(int requestCode, int resultCode, Intent data) {
 ```
 为了正确处理结果，你必须明白结果Intent是什么格式的。如果是你自己的activity返回的结果当然很简单。android平台提供了自己的API，你可以通过他们获得明确的result data。比如联系人总是返回一个带有被选择的联系人的Uri，相机总是返回一个在"data"的extra里面包含Bitmap的数据。
 另外，android 2.3之后，联系人app可以授予你的app一个临时权限来从Contacts Provider读取结果。但是只允许你读取特定的需求的联系人，所以你没法去查询一个联系人，除非你声明READ_CONTACTS权限。
+
+如果你的app能处理可能对其他app有用的操作，你应该准备好从其他app接受action请求。比如如果你做了一个可以分享信息给朋友的app，你最好能支持ACTION_SEND intent。为了让其他app能启动你的activity，你需要在manifest里面添加相应activity的<intent-filter>元素。
+当你的app被安装后，系统会识别你的intent filter并把信息添加到一个被所有app支持的intents的内部目录。当app用**隐式intent**调用startActivity或者xxxForResult，系统会找到能响应它的
+activity。只有一个activity的intent filter满足下面的标准，系统才可能会把intent发给它：
+- <action> 描述需要执行的动作的字符串。通常是平台定义好的比如ACTION_SEND, ACTION_VIEW。如果不是平台的常量是你自己定义的，必须使用全名。
+- <data> 使用一个或者多个属性来指定与intent相关联的数据类型。你可以仅指定MIME type，URI前缀，URI scheme，或者它们的组合。如果你不需要指定data的Uri，比如你的activity使用了extra data而不是URI，你应该指定`android:mimeType`属性，如`text/plain`, `image/jpeg`
+- <category> 提供额外的方式来个性化处理intent的activity。通常使用默认的CATEGORY_DEFAULT。如果没添加这个category，那你的activity就不能处理隐式的intent。
+- 
+你可以在activity任何生命周期调用`getIntent()`来解析启动这个activity的intent。但是通常会在onCreate或者onStart里面：
+```
+@Override
+protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    setContentView(R.layout.main);
+
+    // Get the intent that started this activity
+    Intent intent = getIntent();
+    Uri data = intent.getData();
+
+    // Figure out what to do based on the intent type
+    if (intent.getType().indexOf("image/") != -1) {
+        // Handle intents with image data ...
+    } else if (intent.getType().equals("text/plain")) {
+        // Handle intents with text ...
+    }
+}
+```
+如果需要给调用它的activity返回数据，只要`setResult()`指定结果码和结果intent就行。当你操作完成而用户应该返回到原activity时，调用finish来关闭你的activity：
+```
+// Create intent to deliver some kind of result data
+Intent result = new Intent("com.example.RESULT_ACTION", Uri.parse("content://result_uri");
+setResult(Activity.RESULT_OK, result);
+finish();
+```
+你必须指定一个result code给这个result。然后你可以用Intent提供额外的数据。这个结果默认是RESULT_CANCELED，所以如果用户在操作完成之前点了返回，原activity就能收到一个取消的result。如果你只是需要返回一个代表几种可能的结果之一的数值，你可以直接把result code设为大于0的任意值。如果你不需要包含intent，你可以只传一个result code: `setResult(RESULT_COLOR_RED);
+finish();` 这对于返回结果到你自己的app时很好用。因为这个result可以指向决定返回值的常量。不需要检查你的activity是startActivity还是ForResult调用的。只要写上setResult防止启动你的activity需要一个结果。如果不需要，结果会被忽略。
+
+##Working with System Permissions
+
+>To protect the system's integrity and the user's privacy, Android runs each app in a limited access sandbox. If the app wants to use resources or information of ites sandbox, the app has to explicitly request permission.
+为了保护系统完整性和用户隐私，android在一个有限权限的沙箱里运行每个app。如果这个app像用沙箱之外的资源、信息，就需要明确地申请权限。
+
+取决于权限有多敏感，系统可能会自动授予权限，或者让用户来选择授权与否。比如如果你的app要求打开设备的闪光灯，系统就自动授授权；但是如果你需要读取联系人，系统就会询问用户是否允许。取决于平台的版本，如果是Android5.1和之前的版本，就会在安装的时候让用户授权；如果是6.0或者更高版本，就会在运行时询问用户。通常来说，只要app想用到这个app本身不创造的资源、信息，或者进行影响到设备或者其他app的操作，都需要权限。例如访问网络、使用相机、开关wifi，都需要相应权限。你的app只需要它亲自操作的权限，并不需要其他app来执行或者提供信息的权限。比如如果你的app需要从联系人app中读取信息，就不需要READ_CONTACTS，而那个联系人app才需要。（但是如果你app直接读取用户的联系人时就需要）
+申请权限时，需要在manifest的顶级（top-level）元素下加入例如`<uses-permission android:name="android.permission.SEND_SMS"/>`，这样就可以有发信息的权限。
+
+
