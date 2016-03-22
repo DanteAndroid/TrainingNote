@@ -377,3 +377,71 @@ public File getTempFile(Context context, String url) {
     return file;
 }
 ```
+你的app的内部存储文件夹放在在android文件系统中的一个特殊位置，它是由你的包名决定的。严格来说，只要你把文件模式设为可读，其他app就可以读取你app的内部文件。但是，他还得知道你app的包名、文件名。所以只要你把内部存储文件设为`MODE_PRIVATE`，其他app就绝对没法访问。
+
+在访问外部存储之前，你应该总是先判断是否可用（因为可能用户连接存储到PC，或者移除SD卡）：
+```
+/* Checks if external storage is available for read and write */
+public boolean isExternalStorageWritable() {
+    String state = Environment.getExternalStorageState();
+    if (Environment.MEDIA_MOUNTED.equals(state)) {
+        return true;
+    }
+    return false;
+}
+
+/* Checks if external storage is available to at least read */
+public boolean isExternalStorageReadable() {
+    String state = Environment.getExternalStorageState();
+    if (Environment.MEDIA_MOUNTED.equals(state) ||
+        Environment.MEDIA_MOUNTED_READ_ONLY.equals(state)) {
+        return true;
+    }
+    return false;
+}
+```
+尽管外部存储对于用户和其他app都是可修改的，你还是可以有俩类别的文件可以保存：
+>Public files
+Files that should be freely available to other apps and to the user. When the user uninstalls your app, these files should remain available to the user.
+For example, photos captured by your app or other downloaded files.
+公共文件：
+可以让用户和其他app自由访问的文件。应用被卸载时，这些文件应该保留。例如由你app拍摄或者下载的文件。
+
+>Private files
+Files that rightfully belong to your app and should be deleted when the user uninstalls your app. Although these files are technically accessible by the user and other apps because they are on the external storage, they are files that realistically don't provide value to the user outside your app. When the user uninstalls your app, the system deletes all files in your app's external private directory.
+For example, additional resources downloaded by your app or temporary media files.
+
+私有文件：
+你app合法拥有的，卸载时应当被删除的文件。尽管技术上来说，用户和其他app可以访问这些文件，但是他们在脱离你app之后就没什么意义（价值）。当用户卸载app时，系统会删掉你外部私人目录中的文件。例如，你app下载的扩充资源或者缓存的媒体文件。
+
+如果要保存到外部存储的公共文件，用`getExternalStoragePublicDirectory()`（记得先判断外部存储可用性）：
+```
+    // Get the directory for the user's public pictures directory. 
+    File file = new File(Environment.getExternalStoragePublicDirectory(
+            Environment.DIRECTORY_PICTURES), albumName);
+    if (!file.mkdirs()) {
+        Log.e(LOG_TAG, "Directory not created");
+    }
+    return file;
+}
+```
+如果要保存私有文件，用`getExternalFilesDir()`（这个方法创建的每个目录都会被加到一个包含了了你所有外部存储文件的父目录）：
+```
+public File getAlbumStorageDir(Context context, String albumName) {
+    // Get the directory for the app's private pictures directory. 
+    File file = new File(context.getExternalFilesDir(
+            Environment.DIRECTORY_PICTURES), albumName);
+    if (!file.mkdirs()) {
+        Log.e(LOG_TAG, "Directory not created");
+    }
+    return file;
+}
+```
+如果预定义的子文件夹名称不能满♂足♀你，你可以调用`getExternalFilesDir()`并传入null。这样会返回你app在外部存储的私有文件夹的根目录（以下简称为根目录）。记住，`getExternalFilesDir()`会在根目录下创建一个目录，而这个根目录会在app卸载的时候也被删除（因为它是私有文件夹呀）。
+>Regardless of whether you use getExternalStoragePublicDirectory() for files that are shared or getExternalFilesDir() for files that are private to your app, it's important that you use directory names provided by API constants like DIRECTORY_PICTURES. These directory names ensure that the files are treated properly by the system. For instance, files saved in DIRECTORY_RINGTONES are categorized by the system media scanner as ringtones instead of music.
+无论你用getExternalStoragePublicDirectory()还是getExternalFilesDir()保存文件，有一件事很重要：使用系统提供的文件夹名的API比如DIRECTORY_PICUTRES。这些文件夹名可以确保系统能正确处理里面的文件。比如保存在`DIRECTORY_RINGTONES`里的文件会被系统媒体扫描器分类到铃声而不是音乐。
+
+如果你知道你要保存的数据有多大，你可以直接使用`getFreeSpace()`或`getTotalSpace()`查询可用空间而不需要抛出`IOException`。这俩方法分别提供：现在可用的空间；存储器的总空间。但是捏，系统并不保证你获得的可用空间就是你能写的空间（字节）。如果返回的空间比你想写入的多几mb，或者文件系统占用了90%以下。否则你可能不该写入。
+并不一定非得在保存文件之前查询可用空间，你可以直接写入，然后catch an `IOException`。比如你想把PNG图片转成JPEG，你就不知道文件有多大。
+
+你可以直接调用文件的delete方法来删除。如果文件保存在内部存储，可以用`mContext.deleteFile(fileName);`来定位并删除文件。当app被卸载时，系统会删掉：内部存储的所有文件；外部存储中，使用getExternalFilesDir()创建的文件。但是呢，你应该定期清理所有用`getCacheDir()`创建的缓存文件，定期删除其他你不需要的文件。
