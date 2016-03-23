@@ -884,3 +884,43 @@ void handleSendMultipleImages(Intent intent) {
 
 ## Manage Audio Playback
 
+> A good user experience is a predictable one
+
+好的用户体验是可控的（可预测的）。如果你的app播放音视频，那么能让用户通过软件或者硬件的方式来调节设备、蓝牙、耳机的音量就很重要。（同样地，播放、暂停、停止、跳过、前一首如果需要的话，也应该执行各自的行为）。创造一个可控的音频体验的第一步，是搞清楚你app用的是哪个音频流(audio stream)。
+系统为播放音乐，闹铃，电话铃，系统提示音，电话音量，和DTMF tones（什么鬼）都维持了一个独立的音频流。这样主要为了让用户能独立控制每个流的音量。大部分流都受限于系统事件，所以除非你app是第三方闹钟，播放音频基本上一定用的是`STREAM_MUSIC`流。
+大部分情况，按下音量键都会改变正在活跃的音频流，如果你app啥都没放，就只会改变手机铃声音量。如果你搞的是音乐或者游戏app，那么很可能当用户按下音量键的时候，他们想控制游戏或音乐的音量，即便可能歌曲正在切换，或者当前游戏场景没音乐。这种情况下，可能想监听音量键并修改你音频流的音量。请你忍住这个欲♂望♀。android提供了现成的`setVolumeControlStream()`方法来联系音量键和你指定的stream。（原文Android provides the handy setVolumeControlStream() method to direct volume key presses to the audio stream you specify.感觉direct应该换成associate之类的）
+确认了你app会用的音频流后，你应该把他设为目标声音流。你应该在app生命周期中尽早调用（onCreate），因为只需要调用一次。这方法确保无论你app是否可见，音量键总是能像用户预期的一样工作。`setVolumeControlStream(AudioManager.STREAM_MUSIC);`从这时开始，按下音量键就会影响到你指定的audio stream，无论目标activity或fragment是不是可见的。
+
+播放、暂停、前一首等等媒体播放键在一些耳机和许多手机上都有。当用户按下这些实体键时，系统会发一个带`AXCCTION_MEDIA_BUTTON`的action的Intent的广播。为了响应它，你得注册一个BroadcastReceiver：
+```
+<receiver android:name=".RemoteControlReceiver">
+    <intent-filter>
+        <action android:name="android.intent.action.MEDIA_BUTTON" />
+    </intent-filter>
+</receiver>
+```
+这广播的intent里包含一个EXTRA_KEY_EVENT，里面有个KeyEvent对象，你可以取出Key code来判断是哪个按键触发的广播：
+```
+public class RemoteControlReceiver extends BroadcastReceiver {
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        if (Intent.ACTION_MEDIA_BUTTON.equals(intent.getAction())) {
+            KeyEvent event = (KeyEvent)intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT);
+            if (KeyEvent.KEYCODE_MEDIA_PLAY == event.getKeyCode()) {
+                // Handle key press.
+            }
+        }
+    }
+}
+```
+因为可能有多个app想监听媒体键，你必须得在需要的时候来注册媒体键事件的receiver。注册后你的broadcast receiver就是所有媒体键广播的唯一的监听者。
+```
+AudioManager am = mContext.getSystemService(Context.AUDIO_SERVICE);
+...
+// Start listening for button presses
+am.registerMediaButtonEventReceiver(RemoteControlReceiver);
+...
+// Stop listening for button presses
+am.unregisterMediaButtonEventReceiver(RemoteControlReceiver);
+```
+一般来说，当app不活跃或者不可见的时候就该取消注册，比如在onStop里。但是，对于媒体播放的app没那么简单——实际上，反而当你app不可见的时候监听媒体键才是最重要的时候，因为它没法用屏幕上的(on-screen) UI来控制。所以较好的处理方法是你app获得/失去音频焦点的时候来注册/解除receiver。
