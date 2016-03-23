@@ -788,6 +788,7 @@ void handleSendMultipleImages(Intent intent) {
 检查进来的数据时，一定要额外小心，你永远不知道其他app会发送**什♂么♀数据**给你。比如可能会有错的MIME type被设置，或者发送的图片超级超级大，另外，记得在子线程不要在主线程处理二进制数据。
 
 从4.0开始，实现一个高效的、用户友好的分享操作变得更加简单。使用ActionProvide，只要依附到actionBar的一个菜单项（menu item），就可以处理外观和点击的行为。至于ShareActionProvider，你只要提供一个share intent它就会帮你处理好。要用SAP的话，只要在菜单项里面加一个`actionProviderClass`属性就行了：
+
 > //注意，这段是官方提供的代码，但是亲测不能正常显示
     <menu xmlns:android="http://schemas.android.com/apk/res/android">
         <item
@@ -798,34 +799,26 @@ void handleSendMultipleImages(Intent intent) {
                 "android.widget.ShareActionProvider" />
         ...
     </menu>
-
-> ```
+    //Activity 代码
     private ShareActionProvider mShareActionProvider;
     ...
-
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate menu resource file.
         getMenuInflater().inflate(R.menu.share_menu, menu);
-
         // Locate MenuItem with ShareActionProvider
         MenuItem item = menu.findItem(R.id.menu_item_share);
-
         // Fetch and store ShareActionProvider
         mShareActionProvider = (ShareActionProvider) item.getActionProvider();
-
         // Return true to display menu
         return true;
     }
-
     // Call to update the share intent
     private void setShareIntent(Intent shareIntent) {
         if (mShareActionProvider != null) {
             mShareActionProvider.setShareIntent(shareIntent);
         }
     }
-```
-
 
 ```
 //这是stackoverflow的代码，其中dante可以是你自定义的名字（"android"、"app"除外），亲测可用（不保证未来版本仍然可用）
@@ -837,14 +830,48 @@ void handleSendMultipleImages(Intent intent) {
         dante:actionProviderClass="android.support.v7.widget.ShareActionProvider"
         dante:showAsAction="ifRoom" />
 </menu>
-```
-
-```
+ //Activity或Fragment的代码（这里是fragment）
     @Override
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
         getActivity().getMenuInflater().inflate(R.menu.share_menu, menu);
         MenuItem item = menu.findItem(R.id.menu_item_share);
         mShareActionProvider = (ShareActionProvider) MenuItemCompat.getActionProvider(item);
-        setShareIntent();
+        setShareIntent();//这里同官方代码，每次更新intent的时候都要setShareIntent一下。
     }
 ```
+
+###分享文件：
+
+为了安全地从分享文件给其他app，你得给文件配置一个安全的处理方法，以一个内容URI的形式。android的FileProvicer组件为文件生成了内容URI，基于你在XML文件中的详细定义。
+为你app定义FileProvider需要在manifest中定义一个入口(entry)，这个入口包含生成内容URI的授权信息，和XML的文件名（这个XML指定了你app能分享的目录）：
+```
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.example.myapp">
+    <application
+        ...>
+        <provider
+            android:name="android.support.v4.content.FileProvider"
+            android:authorities="com.example.myapp.fileprovider"
+            android:grantUriPermissions="true"
+            android:exported="false">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/filepaths" />
+        </provider>
+        ...
+    </application>
+</manifest>
+```
+在这里，android:authorities指定了你想用于由FileProvider生成的内容URI的URI授权。对于你自己的app来说，指定一个authority，由包名+"fileprovider"组成比较好。Provider的子元素<meta-data>指向了记录你想分享的文件夹路径的XML文件。
+怎么指定你分享的文件夹呢？在你项目的`res/xml/`下创建文件`filepaths.xml`，下面的例子说明了如何分享你app的内部存储下的fiels/文件的子目录：
+```
+<paths>
+    <files-path path="images/" name="myimages" />
+</paths>
+```
+这里，files-path指定了分享files/images/文件夹。
+>The name attribute tells the FileProvider to add the path segment myimages to content URIs for files in the files/images/ subdirectory. 至于name属性，说明了FileProvider给内容URI添加路径块，在files/images/文件下。（看不懂。。）
+
+<paths>元素可以有多个子元素，比如<external-path>，<cache-path>，看名字就知道其作用了。
+那么你现在就完成了FileProvider的定义，它能为你app的内部存储中的files/目录或者其子目录来生成内容URI给文件用。当你ap为文件生成一个内容URI时，它包含了<provider>属性中指定的授权(com.example.myapp.fileprovider), 路径，(myimages/)，和文件名。比如在上面的示例中你定义的FileProvider，你对文件defaul_image.jpg获取一个内容URI，那么FileProvider就会返回这样的URI：`content://com.example.myapp.fileprovider/myimages/default_image.jpg`。（终于有点头绪了，累死了）
+接下来还有几节[分享文件](http://developer.android.com/training/secure-file-sharing/share-file.html)的内容，不翻了，用到的时候再看吧。
