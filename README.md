@@ -599,4 +599,66 @@ finish();` 这对于返回结果到你自己的app时很好用。因为这个res
 取决于权限有多敏感，系统可能会自动授予权限，或者让用户来选择授权与否。比如如果你的app要求打开设备的闪光灯，系统就自动授授权；但是如果你需要读取联系人，系统就会询问用户是否允许。取决于平台的版本，如果是Android5.1和之前的版本，就会在安装的时候让用户授权；如果是6.0或者更高版本，就会在运行时询问用户。通常来说，只要app想用到这个app本身不创造的资源、信息，或者进行影响到设备或者其他app的操作，都需要权限。例如访问网络、使用相机、开关wifi，都需要相应权限。你的app只需要它亲自操作的权限，并不需要其他app来执行或者提供信息的权限。比如如果你的app需要从联系人app中读取信息，就不需要READ_CONTACTS，而那个联系人app才需要。（但是如果你app直接读取用户的联系人时就需要）
 申请权限时，需要在manifest的顶级（top-level）元素下加入例如`<uses-permission android:name="android.permission.SEND_SMS"/>`，这样就可以有发信息的权限。
 
+从android6.0开始，用户可以随时撤回app的权限，哪怕app适配的是低版本的API。因此你应该测试你的app在缺失需要的权限时，能否正常运行。
+如果你的app需要一个风险性权限，你必须在执行相关操作时每次都检查有没有这个权限。用户可能昨天用了相机，但并不能假设今天还有那个权限。
+例如检查写入日历的权限：`int permissionCheck = ContextCompat.checkSelfPermission(thisActivity,Manifest.permission.WRITE_CALENDAR);`如果app拥有这权限，就会返回`PackageManager.PERMISSION_GRANTED`；如果返回PERMISSION_DENIED，app就得向用户申请权限。如果你的app在manifest列出了风险性权限，就必须询问用户来授权。android提供了一些方法来申请权限，这些方法会显示标准的dialog，而且你没法去自定义。
+有时候可能想帮助用户理解你为啥需要某权限。比如用户打开一个相册软件，就不会对它需要相使用相机感到奇怪。但是用户可能想知道为什么它需要获得用户位置或联系人。在你申请权限之前，你应该考虑需不需要给用户一个解释。请记住，你并不想用铺天盖地的解释来压垮用户；如果你给太多解释，用户可能很烦，然后直接卸载掉了。
+一种可行的方法是：**仅当用户关掉那个需要的权限时才提供解释**。如果用户一直关掉权限，但还想用功能说明他可能不了解为啥需要这个权限。此时给他一个解释就很合适。为了查询啥时候需要显示解释，android提供一个方法`shouldShowRequestPermissionRationale()`，如果请求过该权限而用户拒绝了，它就返回true。如果用户关掉权限而且选了不要再询问，这方法就永远返回false。如果设备禁止app访问该权限它也返回false。
+用 `requstPermissions()`申请权限，需要传入权限，和一个int请求码来识别你需要的权限。这方法是异步的，他会迅速执行完，然后在用户响应请求对话框之后，系统会根据结果来调用回调，传入同一个请求码：
+```
+if (ContextCompat.checkSelfPermission(thisActivity,
+                Manifest.permission.READ_CONTACTS)
+        != PackageManager.PERMISSION_GRANTED) {
+    // Should we show an explanation?
+    if (ActivityCompat.shouldShowRequestPermissionRationale(thisActivity,
+            Manifest.permission.READ_CONTACTS)) {
 
+        // Show an expanation to the user *asynchronously* -- don't block
+        // this thread waiting for the user's response! After the user
+        // sees the explanation, try again to request the permission.
+
+    } else {
+        // No explanation needed, we can request the permission.
+
+        ActivityCompat.requestPermissions(thisActivity,
+                new String[]{Manifest.permission.READ_CONTACTS},
+                MY_PERMISSIONS_REQUEST_READ_CONTACTS);
+
+        // MY_PERMISSIONS_REQUEST_READ_CONTACTS is an
+        // app-defined int constant. The callback method gets the
+        // result of the request.
+    }
+}
+
+
+//override this method to find out whether the permission was granted
+@Override
+public void onRequestPermissionsResult(int requestCode,
+        String permissions[], int[] grantResults) {
+    switch (requestCode) {
+        case MY_PERMISSIONS_REQUEST_READ_CONTACTS: {
+            // If request is cancelled, the result arrays are empty.
+            if (grantResults.length > 0
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+
+                // permission was granted, yay! Do the
+                // contacts-related task you need to do.
+
+            } else {
+
+                // permission denied, boo! Disable the
+                // functionality that depends on this permission.
+            }
+            return;
+        }
+        // other 'case' lines to check for other
+        // permissions this app might request
+    }
+}
+```
+这个对话框描述了你需要访问的权限组，而非具体权限，对于每个permission group，用户每次只需要授权一次。如果你app请求同一个group的其他权限，系统会自动授权（调用你的onRequestPermissionsResult()回调，并传入
+PERMISSION_GRANTED）即使用户已经授予同一个group的其他权限，你的app还是得每次需要的时候请求权限。此外，将来group可能会发生变化，你并不能依赖于同组的其他权限。当你在onRequestPermissionsResult中收到PERMISSION_DENIED时，并不能假设用户采取了什么操作（可能勾选了不在询问）。
+
+使用权限和Intent的区别：
+- 用权限：对于操作时用户的体验有完全的控制权，但是可能增加你任务的复杂性（要设计合适的UI）；如果不授权，就完全不可用。
+- Intent：不用设计UI，这意味着用户可能在一个你从来没见过的app上交互；如果用户没指定默认app，用户每次执行操作时都要经历一个额外的选择dialog。（看到这里不得不说Google实在太特么细心了）
