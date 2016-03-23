@@ -790,6 +790,7 @@ void handleSendMultipleImages(Intent intent) {
 从4.0开始，实现一个高效的、用户友好的分享操作变得更加简单。使用ActionProvide，只要依附到actionBar的一个菜单项（menu item），就可以处理外观和点击的行为。至于ShareActionProvider，你只要提供一个share intent它就会帮你处理好。要用SAP的话，只要在菜单项里面加一个`actionProviderClass`属性就行了：
 
 > //注意，这段是官方提供的代码，但是亲测不能正常显示
+
     <menu xmlns:android="http://schemas.android.com/apk/res/android">
         <item
             android:id="@+id/menu_item_share"
@@ -799,6 +800,7 @@ void handleSendMultipleImages(Intent intent) {
                 "android.widget.ShareActionProvider" />
         ...
     </menu>
+    
     //Activity 代码
     private ShareActionProvider mShareActionProvider;
     ...
