@@ -875,3 +875,10 @@ void handleSendMultipleImages(Intent intent) {
 <paths>元素可以有多个子元素，比如<external-path>，<cache-path>，看名字就知道其作用了。
 那么你现在就完成了FileProvider的定义，它能为你app的内部存储中的files/目录或者其子目录来生成内容URI给文件用。当你ap为文件生成一个内容URI时，它包含了<provider>属性中指定的授权(com.example.myapp.fileprovider), 路径，(myimages/)，和文件名。比如在上面的示例中你定义的FileProvider，你对文件defaul_image.jpg获取一个内容URI，那么FileProvider就会返回这样的URI：`content://com.example.myapp.fileprovider/myimages/default_image.jpg`。（终于有点头绪了，累死了）
 接下来还有几节[分享文件](http://developer.android.com/training/secure-file-sharing/share-file.html)的内容，不翻了，用到的时候再看吧。
+
+---
+
+## Multimedia
+
+## Manage Audio Playback
+
