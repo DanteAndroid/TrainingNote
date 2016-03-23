@@ -1,6 +1,7 @@
 # TrainingNote
 ---
 ##Getting started
+
 ###Supporting Different Screens
 >Android automatically scales your layout in order to properly fit the screen. Thus, your layouts for
 different screen sizes don't need to worry about the absolute size of UI elements but instead focus on the 
@@ -25,7 +26,7 @@ to sibling views).
 - xhdpi: 2.0        200*200
 - hdpi: 1.5         150*150
 - mdpi: 1.0       eg.100*100
-
+---
 ###Managing the Activity Lifecycle
 
 >Activity can exist in one of only three states for an extended period of time:
@@ -177,7 +178,7 @@ protected void onCreate(Bundle savedInstanceState) {
 }
 ```
 相比onCreate，你可能会选`onRestoreInstanceState()`，它在`onStart()`后被调用。仅当有保存的state可以恢复的时候，该方法才被调用。所以不用检查Bundle是否为null。
-
+---
 ###Building a Dynamic UI with Fragments
 >To create a dynamic and multi-pane user interface on Android, you need to encapsulate UI components and activity behaviors into modules that you can swap into and out of your activities. You can create these modules with the Fragment class, which behaves somewhat like a nested activity that can define its own layout and manage its own lifecycle.
 为了创建动态的、多面板的UI，你需要封装UI控件和activity行为成模块，这样可以包进你的activity(swap into and out of your activities)。
@@ -445,7 +446,7 @@ public File getAlbumStorageDir(Context context, String albumName) {
 并不一定非得在保存文件之前查询可用空间，你可以直接写入，然后catch an `IOException`。比如你想把PNG图片转成JPEG，你就不知道文件有多大。
 
 你可以直接调用文件的delete方法来删除。如果文件保存在内部存储，可以用`mContext.deleteFile(fileName);`来定位并删除文件。当app被卸载时，系统会删掉：内部存储的所有文件；外部存储中，使用getExternalFilesDir()创建的文件。但是呢，你应该定期清理所有用`getCacheDir()`创建的缓存文件，定期删除其他你不需要的文件。
-
+---
 ###Interacting with Other Apps
 通常你会用explicit intent(显示的、明确的intent)来在activity间切换，它定义了你想启动的组件的类名。但是，如果你
 需要进行独立于app之外的操作，比如查看地图，你得用implicit intent(隐式intent)。它不指定类名，而是声明了一个action。
@@ -561,7 +562,6 @@ activity。只有一个activity的intent filter满足下面的标准，系统才
 - <action> 描述需要执行的动作的字符串。通常是平台定义好的比如ACTION_SEND, ACTION_VIEW。如果不是平台的常量是你自己定义的，必须使用全名。
 - <data> 使用一个或者多个属性来指定与intent相关联的数据类型。你可以仅指定MIME type，URI前缀，URI scheme，或者它们的组合。如果你不需要指定data的Uri，比如你的activity使用了extra data而不是URI，你应该指定`android:mimeType`属性，如`text/plain`, `image/jpeg`
 - <category> 提供额外的方式来个性化处理intent的activity。通常使用默认的CATEGORY_DEFAULT。如果没添加这个category，那你的activity就不能处理隐式的intent。
-- 
 你可以在activity任何生命周期调用`getIntent()`来解析启动这个activity的intent。但是通常会在onCreate或者onStart里面：
 ```
 @Override
@@ -590,7 +590,7 @@ finish();
 ```
 你必须指定一个result code给这个result。然后你可以用Intent提供额外的数据。这个结果默认是RESULT_CANCELED，所以如果用户在操作完成之前点了返回，原activity就能收到一个取消的result。如果你只是需要返回一个代表几种可能的结果之一的数值，你可以直接把result code设为大于0的任意值。如果你不需要包含intent，你可以只传一个result code: `setResult(RESULT_COLOR_RED);
 finish();` 这对于返回结果到你自己的app时很好用。因为这个result可以指向决定返回值的常量。不需要检查你的activity是startActivity还是ForResult调用的。只要写上setResult防止启动你的activity需要一个结果。如果不需要，结果会被忽略。
-
+---
 ##Working with System Permissions
 
 >To protect the system's integrity and the user's privacy, Android runs each app in a limited access sandbox. If the app wants to use resources or information of ites sandbox, the app has to explicitly request permission.
@@ -662,3 +662,4 @@ PERMISSION_GRANTED）即使用户已经授予同一个group的其他权限，你
 使用权限和Intent的区别：
 - 用权限：对于操作时用户的体验有完全的控制权，但是可能增加你任务的复杂性（要设计合适的UI）；如果不授权，就完全不可用。
 - Intent：不用设计UI，这意味着用户可能在一个你从来没见过的app上交互；如果用户没指定默认app，用户每次执行操作时都要经历一个额外的选择dialog。（看到这里不得不说Google实在太特么细心了）
+---
