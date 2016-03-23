@@ -788,14 +788,63 @@ void handleSendMultipleImages(Intent intent) {
 检查进来的数据时，一定要额外小心，你永远不知道其他app会发送**什♂么♀数据**给你。比如可能会有错的MIME type被设置，或者发送的图片超级超级大，另外，记得在子线程不要在主线程处理二进制数据。
 
 从4.0开始，实现一个高效的、用户友好的分享操作变得更加简单。使用ActionProvide，只要依附到actionBar的一个菜单项（menu item），就可以处理外观和点击的行为。至于ShareActionProvider，你只要提供一个share intent它就会帮你处理好。要用SAP的话，只要在菜单项里面加一个`actionProviderClass`属性就行了：
-> 
+> //注意，这段是官方提供的代码，但是亲测不能正常显示
     <menu xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
+        <item
             android:id="@+id/menu_item_share"
             android:showAsAction="ifRoom"
             android:title="Share"
             android:actionProviderClass=
                 "android.widget.ShareActionProvider" />
-    ...
-</menu>
+        ...
+    </menu>
 
+> ```
+    private ShareActionProvider mShareActionProvider;
+    ...
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        // Inflate menu resource file.
+        getMenuInflater().inflate(R.menu.share_menu, menu);
+
+        // Locate MenuItem with ShareActionProvider
+        MenuItem item = menu.findItem(R.id.menu_item_share);
+
+        // Fetch and store ShareActionProvider
+        mShareActionProvider = (ShareActionProvider) item.getActionProvider();
+
+        // Return true to display menu
+        return true;
+    }
+
+    // Call to update the share intent
+    private void setShareIntent(Intent shareIntent) {
+        if (mShareActionProvider != null) {
+            mShareActionProvider.setShareIntent(shareIntent);
+        }
+    }
+```
+
+
+```
+//这是stackoverflow的代码，其中dante可以是你自定义的名字（"android"、"app"除外），亲测可用（不保证未来版本仍然可用）
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:dante="http://schemas.android.com/apk/res-auto" >
+    <item
+        android:id="@+id/menu_item_share"
+        android:title="@string/menu_share"
+        dante:actionProviderClass="android.support.v7.widget.ShareActionProvider"
+        dante:showAsAction="ifRoom" />
+</menu>
+```
+
+```
+    @Override
+    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+        getActivity().getMenuInflater().inflate(R.menu.share_menu, menu);
+        MenuItem item = menu.findItem(R.id.menu_item_share);
+        mShareActionProvider = (ShareActionProvider) MenuItemCompat.getActionProvider(item);
+        setShareIntent();
+    }
+```
