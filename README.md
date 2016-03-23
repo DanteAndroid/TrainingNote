@@ -1,5 +1,5 @@
 # TrainingNote
----
+***
 ##Getting started
 
 ###Supporting Different Screens
@@ -26,7 +26,9 @@ to sibling views).
 - xhdpi: 2.0        200*200
 - hdpi: 1.5         150*150
 - mdpi: 1.0       eg.100*100
----
+
+***
+
 ###Managing the Activity Lifecycle
 
 >Activity can exist in one of only three states for an extended period of time:
@@ -178,7 +180,9 @@ protected void onCreate(Bundle savedInstanceState) {
 }
 ```
 相比onCreate，你可能会选`onRestoreInstanceState()`，它在`onStart()`后被调用。仅当有保存的state可以恢复的时候，该方法才被调用。所以不用检查Bundle是否为null。
----
+
+***
+
 ###Building a Dynamic UI with Fragments
 >To create a dynamic and multi-pane user interface on Android, you need to encapsulate UI components and activity behaviors into modules that you can swap into and out of your activities. You can create these modules with the Fragment class, which behaves somewhat like a nested activity that can define its own layout and manage its own lifecycle.
 为了创建动态的、多面板的UI，你需要封装UI控件和activity行为成模块，这样可以包进你的activity(swap into and out of your activities)。
@@ -446,7 +450,9 @@ public File getAlbumStorageDir(Context context, String albumName) {
 并不一定非得在保存文件之前查询可用空间，你可以直接写入，然后catch an `IOException`。比如你想把PNG图片转成JPEG，你就不知道文件有多大。
 
 你可以直接调用文件的delete方法来删除。如果文件保存在内部存储，可以用`mContext.deleteFile(fileName);`来定位并删除文件。当app被卸载时，系统会删掉：内部存储的所有文件；外部存储中，使用getExternalFilesDir()创建的文件。但是呢，你应该定期清理所有用`getCacheDir()`创建的缓存文件，定期删除其他你不需要的文件。
----
+
+***
+
 ###Interacting with Other Apps
 通常你会用explicit intent(显示的、明确的intent)来在activity间切换，它定义了你想启动的组件的类名。但是，如果你
 需要进行独立于app之外的操作，比如查看地图，你得用implicit intent(隐式intent)。它不指定类名，而是声明了一个action。
@@ -590,7 +596,9 @@ finish();
 ```
 你必须指定一个result code给这个result。然后你可以用Intent提供额外的数据。这个结果默认是RESULT_CANCELED，所以如果用户在操作完成之前点了返回，原activity就能收到一个取消的result。如果你只是需要返回一个代表几种可能的结果之一的数值，你可以直接把result code设为大于0的任意值。如果你不需要包含intent，你可以只传一个result code: `setResult(RESULT_COLOR_RED);
 finish();` 这对于返回结果到你自己的app时很好用。因为这个result可以指向决定返回值的常量。不需要检查你的activity是startActivity还是ForResult调用的。只要写上setResult防止启动你的activity需要一个结果。如果不需要，结果会被忽略。
----
+
+***
+
 ##Working with System Permissions
 
 >To protect the system's integrity and the user's privacy, Android runs each app in a limited access sandbox. If the app wants to use resources or information of ites sandbox, the app has to explicitly request permission.
