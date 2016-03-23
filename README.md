@@ -672,3 +672,130 @@ PERMISSION_GRANTED）即使用户已经授予同一个group的其他权限，你
 - Intent：不用设计UI，这意味着用户可能在一个你从来没见过的app上交互；如果用户没指定默认app，用户每次执行操作时都要经历一个额外的选择dialog。（看到这里不得不说Google实在太特么细心了）
 
 ---
+
+## Content Sharing
+
+如果把Intent传入`Intent.createChooser()`中，就可以每次都显示选择对话框。这有一些额外的好处：
+- 如果没有匹配的app，android会显示提示信息
+- 你可以为选择框指定一个标题
+
+分享文本的示例：
+```
+Intent sendIntent = new Intent();
+sendIntent.setAction(Intent.ACTION_SEND);
+sendIntent.putExtra(Intent.EXTRA_TEXT, "This is my text to send.");
+sendIntent.setType("text/plain");
+startActivity(Intent.createChooser(sendIntent, getResources().getText(R.string.send_to)));
+```
+分享二进制数据通常使用ACTION_SEND加上恰当的MIME type的设置，然后把URI数据放在一个叫`EXTRA_STREAM`附加值里面。通常用来分享图片，但是也可以用来分享任意类型的二进制内容：
+```
+Intent shareIntent = new Intent();
+shareIntent.setAction(Intent.ACTION_SEND);
+shareIntent.putExtra(Intent.EXTRA_STREAM, uriToImage);
+shareIntent.setType("image/jpeg");
+startActivity(Intent.createChooser(shareIntent, getResources().getText(R.string.send_to)));
+```
+你可以用`*/*`的MIME type，但是这样的话只有能处理泛型数据(generic data streams)的activity才会被匹配。
+
+接受的app需要对Uri指向的数据的访问权限。推荐做法：
+> Store the data in your own ContentProvider, making sure that other apps have the correct permission to access your provider. The preferred mechanism for providing access is to use per-URI permissions which are temporary and only grant access to the receiving application. An easy way to create a ContentProvider like this is to use the FileProvider helper class.
+
+- 把数据存储到你自己的ContentProvider，确保其他app有正确权限能访问你的Provider。提供权限的一个极好的技巧是用per-URI permissions，它是临时性的权限，而且只授予给接受的app。一个简单的方法是创造一个像这样的ContentProvider来用FileProvider帮助类（这里翻译不太清楚，因为没用过）。
+
+>Use the system MediaStore. The MediaStore is primarily aimed at video, audio and image MIME types, however beginning with Android 3.0 (API level 11) it can also store non-media types (see MediaStore.Files for more info). Files can be inserted into the MediaStore using scanFile() after which a content:// style Uri suitable for sharing is passed to the provided onScanCompleted() callback. Note that once added to the system MediaStore the content is accessible to any app on the device.
+
+- 用系统的MediaStore（媒体库）。媒体库主要用于视频、音频和图片的MIME类型，但是从3.0开始，就可以存储非媒体类型了。文件可以用`scanFile()`来插入媒体库，可以把符合`content://`格式的Uri传入提供的`onScanComplted()`回调方法。注意，只要加到MediaStore，就能被其他app访问了。
+
+分享多条内容：
+```
+ArrayList<Uri> imageUris = new ArrayList<Uri>();
+imageUris.add(imageUri1); // Add your image URIs here
+imageUris.add(imageUri2);
+
+Intent shareIntent = new Intent();
+shareIntent.setAction(Intent.ACTION_SEND_MULTIPLE);
+shareIntent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, imageUris);
+shareIntent.setType("image/*");
+startActivity(Intent.createChooser(shareIntent, "Share images to.."));
+```
+
+接受其他app的数据，你的activity的manifest可能长这个样子：
+```
+<activity android:name=".ui.MyActivity" >
+    <intent-filter>
+        <action android:name="android.intent.action.SEND" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <data android:mimeType="image/*" />
+    </intent-filter>
+    <intent-filter>
+        <action android:name="android.intent.action.SEND" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <data android:mimeType="text/plain" />
+    </intent-filter>
+    <intent-filter>
+        <action android:name="android.intent.action.SEND_MULTIPLE" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <data android:mimeType="image/*" />
+    </intent-filter>
+</activity>
+```
+处理接受的Intent：
+```
+void onCreate (Bundle savedInstanceState) {
+    ...
+    // Get intent, action and MIME type
+    Intent intent = getIntent();
+    String action = intent.getAction();
+    String type = intent.getType();
+
+    if (Intent.ACTION_SEND.equals(action) && type != null) {
+        if ("text/plain".equals(type)) {
+            handleSendText(intent); // Handle text being sent
+        } else if (type.startsWith("image/")) {
+            handleSendImage(intent); // Handle single image being sent
+        }
+    } else if (Intent.ACTION_SEND_MULTIPLE.equals(action) && type != null) {
+        if (type.startsWith("image/")) {
+            handleSendMultipleImages(intent); // Handle multiple images being sent
+        }
+    } else {
+        // Handle other intents, such as being started from the home screen
+    }
+    ...
+}
+
+void handleSendText(Intent intent) {
+    String sharedText = intent.getStringExtra(Intent.EXTRA_TEXT);
+    if (sharedText != null) {
+        // Update UI to reflect text being shared
+    }
+}
+
+void handleSendImage(Intent intent) {
+    Uri imageUri = (Uri) intent.getParcelableExtra(Intent.EXTRA_STREAM);
+    if (imageUri != null) {
+        // Update UI to reflect image being shared
+    }
+}
+
+void handleSendMultipleImages(Intent intent) {
+    ArrayList<Uri> imageUris = intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
+    if (imageUris != null) {
+        // Update UI to reflect multiple images being shared
+    }
+}
+```
+检查进来的数据时，一定要额外小心，你永远不知道其他app会发送**什♂么♀数据**给你。比如可能会有错的MIME type被设置，或者发送的图片超级超级大，另外，记得在子线程不要在主线程处理二进制数据。
+
+从4.0开始，实现一个高效的、用户友好的分享操作变得更加简单。使用ActionProvide，只要依附到actionBar的一个菜单项（menu item），就可以处理外观和点击的行为。至于ShareActionProvider，你只要提供一个share intent它就会帮你处理好。要用SAP的话，只要在菜单项里面加一个`actionProviderClass`属性就行了：
+> 
+    <menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+            android:id="@+id/menu_item_share"
+            android:showAsAction="ifRoom"
+            android:title="Share"
+            android:actionProviderClass=
+                "android.widget.ShareActionProvider" />
+    ...
+</menu>
+
