@@ -1168,5 +1168,10 @@ protected void onActivityResult(int requestCode, int resultCode, Intent data) {
     }
 }
 ```
-
 接下来一节是[Controlling the camera](http://developer.android.com/intl/zh-cn/training/camera/cameradirect.html)，考虑到只有做相机app才能用到，就不翻了。然后接着的Printing Content也不看了。
+
+## Graphics & Animation
+
+### Display Bitmaps Efficiently
+
+学会如何处理和加载Bitmap可以让你的UI组件快速响应，并避免OOM。如果不小心的话，bitmap可以快速地消耗你的内存。移动设备的内存是有限的，android设备对于每个app来说只有16m的可用内存。但是请记住，许多设备都设了一个较高的上限。像摄影图片的Bitmap是非常占内存的，比如一个500w像素的相机拍出来2592x1936像素的照片，如果用ARGB_8888格式的bitmap（默认格式）大约占据19M（2592x1936*4）内存，一下就把内存上限搞完了。。
