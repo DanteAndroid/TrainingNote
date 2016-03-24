@@ -1,5 +1,5 @@
 # TrainingNote
-***
+---
 ##Getting started
 
 ###Supporting Different Screens
@@ -924,3 +924,249 @@ am.registerMediaButtonEventReceiver(RemoteControlReceiver);
 am.unregisterMediaButtonEventReceiver(RemoteControlReceiver);
 ```
 一般来说，当app不活跃或者不可见的时候就该取消注册，比如在onStop里。但是，对于媒体播放的app没那么简单——实际上，反而当你app不可见的时候监听媒体键才是最重要的时候，因为它没法用屏幕上的(on-screen) UI来控制。所以较好的处理方法是你app获得/失去音频焦点的时候来注册/解除receiver。
+为了避免多个音乐app同时播放，android使用音频焦点(audio focus)来使音频播放符合标准。只有持有焦点的app才应该播放音乐。在你app开始播放之前，它应该申请并接受焦点。同样滴，它应该监听啥时候失去焦点然后做出相应的反应。
+
+对于app正在使用是流，用`requestAudioFocus()`，如果返回`AUDIOFOCUS_REQUEST_GRANTED`就可以获得音频焦点了。无论你想获得的是短暂还是永久的焦点，你都必须指定你在用的流。如果播放短时间的音频，比如一个说明，就用临时焦点；如果在可预见的未来范围内播放音乐就申请永久焦点，比如播放音乐。你应该在准备播放前立刻申请焦点，比如用户按下播放或者游戏下一关开始的背景音乐：
+```
+udioManager am = mContext.getSystemService(Context.AUDIO_SERVICE);
+...
+
+// Request audio focus for playback
+int result = am.requestAudioFocus(afChangeListener,
+                                 // Use the music stream.
+                                 AudioManager.STREAM_MUSIC,
+                                 // Request permanent focus.
+                                 AudioManager.AUDIOFOCUS_GAIN);
+
+if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+    am.registerMediaButtonEventReceiver(RemoteControlReceiver);
+    // Start playback.
+}
+```
+当你播放结束后，一定要`abandonAudioFocus()`。这会通知系统你不再需要焦点，并解除AudioManager.OnAudioFocusChangeListener的关联。临时焦点的弃用，会让任何被中断的app继续播放。`// Abandon audio focus when playback complete    am.abandonAudioFocus(afChangeListener);`
+当你申请临时焦点时，还可以额外选择是否开启"回避模式"(ducking)。通常，一个守规矩的(well-behaved)音频软件会在失去焦点时立刻静音他的播放。要求一个带回避模式的临时焦点，就意味着你告诉其他app，如果他们在焦点返回之前降低声音，还是可以继续播放滴。
+```
+// Request audio focus for playback
+int result = am.requestAudioFocus(afChangeListener,
+                             // Use the music stream.
+                             AudioManager.STREAM_MUSIC,
+                             // Request permanent focus.这里官方注释有错，应该是要求duck模式的临时焦点
+                             AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
+
+if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+    // Start playback.
+}
+```
+duck模式断断续续地播放音频的软件尤其适合，比如外放的驾驶导航。当有其他app像上面说的一样要求音频焦点时，它是永久的还是临时的（支持或者不支持duck）焦点，都会通知到你注册焦点时的listener。`onAudioFocusChange`回调就是用来接收这个事件的。
+
+通常来说，失去临时的焦点应该让你的app保持无声，但是其他方面应该维持状态。你应该继续监听较焦点的变化并准备在重获焦点时，恢复播放。
+如果是永久性缺失焦点，你的app就该高效地结束。实际点说，就是停止播放，移除媒体键监听——让新的播放器独享这些事件——然后抛弃你的音频焦点。
+在那时候，你只能期待用户操作来恢复音频播放了（按下你app的播放键）：
+```
+AudioManager.OnAudioFocusChangeListener afChangeListener =
+    new AudioManager.OnAudioFocusChangeListener() {
+        public void onAudioFocusChange(int focusChange) {
+            if (focusChange == AUDIOFOCUS_LOSS_TRANSIENT) {
+                // Pause playback
+            } else if (focusChange == AudioManager.AUDIOFOCUS_GAIN) {
+                // Resume playback
+            } else if (focusChange == AudioManager.AUDIOFOCUS_LOSS) {
+                am.unregisterMediaButtonEventReceiver(RemoteControlReceiver);
+                am.abandonAudioFocus(afChangeListener);
+                // Stop playback
+            } else if (focusChange == AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) {
+            // Lower the volume
+        } else if (focusChange == AudioManager.AUDIOFOCUS_GAIN) {
+            // Raise it back to normal
+        }
+    }
+        }
+    };
+```
+你可以查询`AudioManager`来判断音频是由扬声器、有线耳机，还是蓝牙输出的：
+```
+if (isBluetoothA2dpOn()) {
+    // Adjust output for Bluetooth.
+} else if (isSpeakerphoneOn()) {
+    // Adjust output for Speakerphone.
+} else if (isWiredHeadsetOn()) {
+    // Adjust output for headsets
+} else { 
+    // If audio plays and noone can hear it, is it still playing?
+}
+```
+当耳机被拔出，或者蓝牙断开连接，音频流就能自动重新输出到内置的扬声器。如果你像我一样（谷歌工程师你好，工程师再见）听音乐声音开的很大，那样就可能会被吓一跳。幸运的是，这种情况下系统会发一个ACTION_AUDIO_BECOMING_NOISY的广播。每当你放音频的时候，注册一个BroadcastReceiver来监听这个Intent都是好习惯。
+```
+private class NoisyAudioStreamReceiver extends BroadcastReceiver {
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        if (AudioManager.ACTION_AUDIO_BECOMING_NOISY.equals(intent.getAction())) {
+            // Pause the playback
+        }
+    }
+}
+
+private IntentFilter intentFilter = new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
+
+private void startPlayback() {
+    registerReceiver(myNoisyAudioStreamReceiver(), intentFilter);
+}
+
+private void stopPlayback() {
+    unregisterReceiver(myNoisyAudioStreamReceiver);
+}
+```
+
+### Capturing Photos
+
+>The world was a dismal and featureless place before rich media became prevalent. Remember Gopher? We don't, either. For your app to become part of your users' lives, give them a way to put their lives into it. Using the on-board cameras, your application can enable users to augment what they see around them, make unique avatars, look for zombies around the corner, or simply share their experiences.
+
+在富媒体普及之前，这个世界是黯淡无光、毫无特色的。记得Gopher（WWW普及前一个信息检索网站）么？我们也忘了。为了让你的app成为用户生活的一部分，提供一种方式把他们的生活放进app中。使用自带的相机，你的app可以让用户讨论他们生活中有啥，制作自己的专属头像，寻找角落的僵尸，或者就是纯粹地分享他们的经历。
+
+如果你app的基本功能之一是拍照，那么可以让你的app在Google Play上仅对有相机的设备可见，添加uses-feature：
+```
+<manifest ... >
+    <uses-feature android:name="android.hardware.camera"
+                  android:required="true" />
+    ...
+</manifest>
+```
+如果用，但是并不是必须的，可以设为false，那么没相机的设备也能下载到。然后在运行时检查相机可用性就是你的责任了。`hasSystemFeature(PackageManager.FEATURE_CAMERA)`。（译者注：uses-feature这个属性对于国内的store应该是没意义的）
+开启拍照的代码：
+```
+static final int REQUEST_IMAGE_CAPTURE = 1;
+
+private void dispatchTakePictureIntent() {
+    Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+    if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
+        startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE);
+    }
+}
+```
+android相机会把照片编码之后作为一个小的Bitmap（只是个thumbnail，缩略图，适合作为icon，如果要大图还需要一些代码），放在Intent的extras里面，key是"data"：
+```
+@Override
+protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+    if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK) {
+        Bundle extras = data.getExtras();
+        Bitmap imageBitmap = (Bitmap) extras.get("data");
+        mImageView.setImageBitmap(imageBitmap);
+    }
+}
+```
+
+android相机可以保存全尺寸的照片，但是你必须提供一个有效的、相机能保存的文件全名。一般来说，用户拍的照片都该保存到外部存储的公共文件夹中，这样所有app都能访问。（用getExternalStoragePublicDirectory()和DIRECTORY_PICTURES参数）读取和写入这个文件夹分别需要READ_EXTERNAL_STORAGE和 WRITE_EXTERNAL_STORAGE权限。但是如果你想让照片仅用于你的app，你可以用getExternalFilesDir（注：如果你还记得的话，这个文件夹在你app卸载时也会被删掉）。用这个方法在4.4以上是不需要写入权限的。所以你可以这么玩：
+```
+<manifest ...>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+                     android:maxSdkVersion="18" />
+    ...
+</manifest>
+```
+决定了文件夹之后，你得创建一个防止冲突的文件名，为了方便后续的使用，你可能还需要创建成员变量。
+```
+String mCurrentPhotoPath;
+
+private File createImageFile() throws IOException {
+    // Create an image file name
+    String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+    String imageFileName = "JPEG_" + timeStamp + "_";
+    File storageDir = Environment.getExternalStoragePublicDirectory(
+            Environment.DIRECTORY_PICTURES);
+    File image = File.createTempFile(
+        imageFileName,  /* prefix */
+        ".jpg",         /* suffix */
+        storageDir      /* directory */
+    );
+
+    // Save a file: path for use with ACTION_VIEW intents
+    mCurrentPhotoPath = "file:" + image.getAbsolutePath();
+    return image;
+}
+```
+这方法可以为照片创建一个文件。然后你可以这么调用Intent：
+```
+static final int REQUEST_TAKE_PHOTO = 1;
+
+private void dispatchTakePictureIntent() {
+    Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+    // Ensure that there's a camera activity to handle the intent
+    if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
+        // Create the File where the photo should go
+        File photoFile = null;
+        try {
+            photoFile = createImageFile();
+        } catch (IOException ex) {
+            // Error occurred while creating the File
+            ...
+        }
+        // Continue only if the File was successfully created
+        if (photoFile != null) {
+        //这里跟使用缩略图的区别就是多一个EXTRA_OUTPUT
+            takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT,
+                    Uri.fromFile(photoFile));
+            startActivityForResult(takePictureIntent, REQUEST_TAKE_PHOTO);
+        }
+    }
+}
+```
+当你用这样的intent创造了一个照片时，你就知道你的图片在哪了。但是对其他人来说，访问你照片的最简单方法，就是让它能从媒体库中访问（Media Provider）。（如果你用的是getExternalFilesDir，媒体扫描器就不能访问这些文件）。
+```
+private void galleryAddPic() {
+    Intent mediaScanIntent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
+    File f = new File(mCurrentPhotoPath);
+    Uri contentUri = Uri.fromFile(f);
+    mediaScanIntent.setData(contentUri);
+    this.sendBroadcast(mediaScanIntent);
+}
+```
+管理多个全尺寸的图片，对于有限的内存来说很棘手。如果你发现app显示几张图之后就OOM了，你可以通过扩展JPEG到一个已经匹配目标view的尺寸的内存数组里面，来减少动态堆的使用(you can dramatically reduce the amount of dynamic heap used by expanding the JPEG into a memory array that's already scaled to match the size of the destination view.)。
+```
+private void setPic() {
+    // Get the dimensions of the View
+    int targetW = mImageView.getWidth();
+    int targetH = mImageView.getHeight();
+
+    // Get the dimensions of the bitmap
+    BitmapFactory.Options bmOptions = new BitmapFactory.Options();
+    bmOptions.inJustDecodeBounds = true;
+    BitmapFactory.decodeFile(mCurrentPhotoPath, bmOptions);
+    int photoW = bmOptions.outWidth;
+    int photoH = bmOptions.outHeight;
+
+    // Determine how much to scale down the image
+    int scaleFactor = Math.min(photoW/targetW, photoH/targetH);
+
+    // Decode the image file into a Bitmap sized to fill the View
+    bmOptions.inJustDecodeBounds = false;
+    bmOptions.inSampleSize = scaleFactor;
+    bmOptions.inPurgeable = true;
+
+    Bitmap bitmap = BitmapFactory.decodeFile(mCurrentPhotoPath, bmOptions);
+    mImageView.setImageBitmap(bitmap);
+}
+```
+然后是视频的录制和获取：
+```
+static final int REQUEST_VIDEO_CAPTURE = 1;
+
+private void dispatchTakeVideoIntent() {
+    Intent takeVideoIntent = new Intent(MediaStore.ACTION_VIDEO_CAPTURE);
+    if (takeVideoIntent.resolveActivity(getPackageManager()) != null) {
+        startActivityForResult(takeVideoIntent, REQUEST_VIDEO_CAPTURE);
+    }
+}
+
+...
+
+//retrieve this video and displays it in a VideoView
+@Override
+protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+    if (requestCode == REQUEST_VIDEO_CAPTURE && resultCode == RESULT_OK) {
+        Uri videoUri = intent.getData();
+        mVideoView.setVideoURI(videoUri);
+    }
+}
+```
+
+接下来一节是[Controlling the camera](http://developer.android.com/intl/zh-cn/training/camera/cameradirect.html)，考虑到只有做相机app才能用到，就不翻了。然后接着的Printing Content也不看了。
