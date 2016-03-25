@@ -1266,4 +1266,11 @@ class BitmapWorkerTask extends AsyncTask<Integer, Void, Bitmap> {
     }
 }
 ```
-对imageView的弱引用确保了asynctask不会阻止imageView
+对imageView的弱引用确保了asynctask不会影响到imageView和其引用的对象被GC（回收）。没法确定当任务完成后imageview还存在，所以你得在onPostExecute中检查它的引用。比如任务完成之前，用户离开activity或者配置改变（屏幕旋转），imageview都可能不在存在。
+```
+//这代码可以看出复用的重要性。
+public void loadBitmap(int resId, ImageView imageView) {
+    BitmapWorkerTask task = new BitmapWorkerTask(imageView);
+    task.execute(resId);
+}
+```
