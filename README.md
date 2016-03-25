@@ -1175,3 +1175,95 @@ protected void onActivityResult(int requestCode, int resultCode, Intent data) {
 ### Display Bitmaps Efficiently
 
 学会如何处理和加载Bitmap可以让你的UI组件快速响应，并避免OOM。如果不小心的话，bitmap可以快速地消耗你的内存。移动设备的内存是有限的，android设备对于每个app来说只有16m的可用内存。但是请记住，许多设备都设了一个较高的上限。像摄影图片的Bitmap是非常占内存的，比如一个500w像素的相机拍出来2592x1936像素的照片，如果用ARGB_8888格式的bitmap（默认格式）大约占据19M（2592x1936*4）内存，一下就把内存上限搞完了。。
+一般bitmap都要比在屏幕上显示的尺寸要大，所以受限于有限的内存，我们可以使用匹配UI控件大小的低分辨率的版本。高分辨率的图像没有任何可见的好处，还会占用宝贵的内存和引发额外的性能问题。
+
+`BitmapFactory`为创建来自不同资源的Bitmap提供了几种编译方法`decodeByteArray, decodeFile, decodeResource等`。这些方法会试图为已构建的bitmap分配内存并可以轻易导致OOM，每个编译方法都有额外的签名可以让你指定编译选项。用`BitmapFactory.Options`，设置inJustDecodeBounds为true来让编译时避免内存分配...( Setting the inJustDecodeBounds property to true while decoding avoids memory allocation, returning null for the bitmap object but setting outWidth, outHeight and outMimeType. This technique allows you to read the dimensions and type of the image data prior to construction (and memory allocation) of the bitmap.)
+为了防止OOM, 在decode之前要检查bitmap的边界，除非你绝对信任数据源可以提供给你可预期的尺寸的图像，并能合适地匹配在可用内存内。
+```
+BitmapFactory.Options options = new BitmapFactory.Options();
+options.inJustDecodeBounds = true;
+BitmapFactory.decodeResource(getResources(), R.id.myimage, options);
+int imageHeight = options.outHeight;
+int imageWidth = options.outWidth;
+String imageType = options.outMimeType;
+```
+
+>To tell the decoder to subsample the image, loading a smaller version into memory, set inSampleSize to true in your BitmapFactory.Options object. For example, an image with resolution 2048x1536 that is decoded with an inSampleSize of 4 produces a bitmap of approximately 512x384. Loading this into memory uses 0.75MB rather than 12MB for the full image (assuming a bitmap configuration of ARGB_8888). Here’s a method to calculate a sample size value that is a power of two based on a target width and height. A power of two value is calculated because the decoder uses a final value by rounding down to the nearest power of two, as per the inSampleSize documentation.
+
+这段不好翻就懒得翻了。
+```
+public static int calculateInSampleSize(
+            BitmapFactory.Options options, int reqWidth, int reqHeight) {
+    // Raw height and width of image
+    final int height = options.outHeight;
+    final int width = options.outWidth;
+    int inSampleSize = 1;
+
+    if (height > reqHeight || width > reqWidth) {
+
+        final int halfHeight = height / 2;
+        final int halfWidth = width / 2;
+
+        // Calculate the largest inSampleSize value that is a power of 2 and keeps both
+        // height and width larger than the requested height and width.
+        while ((halfHeight / inSampleSize) > reqHeight
+                && (halfWidth / inSampleSize) > reqWidth) {
+            inSampleSize *= 2;
+        }
+    }
+
+    return inSampleSize;
+}
+```
+To use this method, first decode with inJustDecodeBounds set to true, pass the options through and then decode again using the new inSampleSize value and inJustDecodeBounds set to false:
+```
+public static Bitmap decodeSampledBitmapFromResource(Resources res, int resId,
+        int reqWidth, int reqHeight) {
+
+    // First decode with inJustDecodeBounds=true to check dimensions
+    final BitmapFactory.Options options = new BitmapFactory.Options();
+    options.inJustDecodeBounds = true;
+    BitmapFactory.decodeResource(res, resId, options);
+
+    // Calculate inSampleSize
+    options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight);
+
+    // Decode bitmap with inSampleSize set
+    options.inJustDecodeBounds = false;
+    return BitmapFactory.decodeResource(res, resId, options);
+}
+```
+然后这方法可以把一个大的bitmap加载到一个比较小的imageView中：
+`mImageView.setImageBitmap(decodeSampledBitmapFromResource(getResources(), R.id.myimage, 100, 100));`
+
+上节课中的BitmapFactory.decode*方法，如果源数据来自磁盘或者网络或者任何非内存外的地方，那么这个方法就不能执行在主线程。加载数据的时间不可预测，而且是由很多因素决定的（硬盘读取速度，网络速度，图片尺寸，CPU，etc）。那么可以用Asynctask。它提供了简单的方法来在后台线程工作，并把结果发送到主线程。示例：
+```
+class BitmapWorkerTask extends AsyncTask<Integer, Void, Bitmap> {
+    private final WeakReference<ImageView> imageViewReference;
+    private int data = 0;
+
+    public BitmapWorkerTask(ImageView imageView) {
+        // Use a WeakReference to ensure the ImageView can be garbage collected
+        imageViewReference = new WeakReference<ImageView>(imageView);
+    }
+
+    // Decode image in background.
+    @Override
+    protected Bitmap doInBackground(Integer... params) {
+        data = params[0];
+        return decodeSampledBitmapFromResource(getResources(), data, 100, 100));
+    }
+
+    // Once complete, see if ImageView is still around and set bitmap.
+    @Override
+    protected void onPostExecute(Bitmap bitmap) {
+        if (imageViewReference != null && bitmap != null) {
+            final ImageView imageView = imageViewReference.get();
+            if (imageView != null) {
+                imageView.setImageBitmap(bitmap);
+            }
+        }
+    }
+}
+```
+对imageView的弱引用确保了asynctask不会阻止imageView
