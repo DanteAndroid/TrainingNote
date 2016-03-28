@@ -1274,3 +1274,311 @@ public void loadBitmap(int resId, ImageView imageView) {
     task.execute(resId);
 }
 ```
+常见的views比如listView和gridView，当与asynctask结合使用时，又引入另一个问题。为了高效利用内存，当用户滚动时，这些控件会回收子views。没法保证任务结束时，相关的view没有为下一个子view做准备而被回收。进一步来说，没法保证异步任务开始时的顺序和结束时的顺序（是一样的）。
+
+//TODO 下面一段。。由于对弱引用不了解。暂不翻译
+Create a dedicated Drawable subclass to store a reference back to the worker task. In this case, a BitmapDrawable is used so that a placeholder image can be displayed in the ImageView while the task completes:
+
+ static class AsyncDrawable extends BitmapDrawable {
+    private final WeakReference<BitmapWorkerTask> bitmapWorkerTaskReference;
+
+    public AsyncDrawable(Resources res, Bitmap bitmap,
+            BitmapWorkerTask bitmapWorkerTask) {
+        super(res, bitmap);
+        bitmapWorkerTaskReference =
+            new WeakReference<BitmapWorkerTask>(bitmapWorkerTask);
+    }
+
+    public BitmapWorkerTask getBitmapWorkerTask() {
+        return bitmapWorkerTaskReference.get();
+    }
+}
+Before executing the BitmapWorkerTask, you create an AsyncDrawable and bind it to the target ImageView:
+
+public void loadBitmap(int resId, ImageView imageView) {
+    if (cancelPotentialWork(resId, imageView)) {
+        final BitmapWorkerTask task = new BitmapWorkerTask(imageView);
+        final AsyncDrawable asyncDrawable =
+                new AsyncDrawable(getResources(), mPlaceHolderBitmap, task);
+        imageView.setImageDrawable(asyncDrawable);
+        task.execute(resId);
+    }
+}
+The cancelPotentialWork method referenced in the code sample above checks if another running task is already associated with the ImageView. If so, it attempts to cancel the previous task by calling cancel(). In a small number of cases, the new task data matches the existing task and nothing further needs to happen. Here is the implementation of cancelPotentialWork:
+
+public static boolean cancelPotentialWork(int data, ImageView imageView) {
+    final BitmapWorkerTask bitmapWorkerTask = getBitmapWorkerTask(imageView);
+
+    if (bitmapWorkerTask != null) {
+        final int bitmapData = bitmapWorkerTask.data;
+        // If bitmapData is not yet set or it differs from the new data
+        if (bitmapData == 0 || bitmapData != data) {
+            // Cancel previous task
+            bitmapWorkerTask.cancel(true);
+        } else {
+            // The same work is already in progress
+            return false;
+        }
+    }
+    // No task associated with the ImageView, or an existing task was cancelled
+    return true;
+}
+A helper method, getBitmapWorkerTask(), is used above to retrieve the task associated with a particular ImageView:
+
+private static BitmapWorkerTask getBitmapWorkerTask(ImageView imageView) {
+   if (imageView != null) {
+       final Drawable drawable = imageView.getDrawable();
+       if (drawable instanceof AsyncDrawable) {
+           final AsyncDrawable asyncDrawable = (AsyncDrawable) drawable;
+           return asyncDrawable.getBitmapWorkerTask();
+       }
+    }
+    return null;
+}
+The last step is updating onPostExecute() in BitmapWorkerTask so that it checks if the task is cancelled and if the current task matches the one associated with the ImageView:
+
+ class BitmapWorkerTask extends AsyncTask<Integer, Void, Bitmap> {
+    ...
+
+    @Override
+    protected void onPostExecute(Bitmap bitmap) {
+        if (isCancelled()) {
+            bitmap = null;
+        }
+
+        if (imageViewReference != null && bitmap != null) {
+            final ImageView imageView = imageViewReference.get();
+            final BitmapWorkerTask bitmapWorkerTask =
+                    getBitmapWorkerTask(imageView);
+            if (this == bitmapWorkerTask && imageView != null) {
+                imageView.setImageBitmap(bitmap);
+            }
+        }
+    }
+}
+This implementation is now suitable for use in ListView and GridView components as well as any other components that recycle their child views. Simply call loadBitmap where you normally set an image to your ImageView. For example, in a GridView implementation this would be in the getView() method of the backing adapter.
+
+加载单个bitmap到界面上是很简单的，但是如果你需要一次加载一大堆图片，就有点复杂了。许多情况下（比如用GridView或者ViewPager,RecyclerView）屏幕上的图片数和即将滚动到屏幕的图片理论上可以是无限的。这些组件通过当子views离开屏幕时对其进行回收，降低了内存的使用。GC还会在你没有保有长期引用时释放你加载的bitmap。一切都是那么棒棒哒(be all good and well)，但是为了保持流畅和快速加载UI，你要避免每次图片回到屏幕时都反复处理图片。那么内存和磁盘（内部存储）缓存就派上用场了，可以让控件快速重新加载、处理图片。（译者注：我们可以通过第三方加载图片库来达到这个目的，但是翻译这里是为了了解机制和思想）
+
+内存缓存(memory cache)以占据应用内存空间为代价，提供了对bitmap的快速访问。LruCache尤其适合缓存bitmap的任务，在一个LinkedHashMap中持有最近的引用对象，并在缓存超限之前释放了最少被使用的成员。注意，在以前，流行的内存缓存的实现是用弱引用或者软引用 bitmap cache，但这并不推荐。从android2.3GC对于弱引用和软引用的回收变得更剧烈(aggressive)，这让他们相当低效(faily ineffective)。3.0之前，bitmap数据的备份被存在本地内存且不会被可预期的方法释放，潜在地可能导致OOM。
+为了选择合适大小的LruCache，一些因素需要考虑：
+- 你的activity/application 剩余的内存有多密集(intentsive)？
+- 屏幕一次加载多少图片？有多少需要准备好以显示到屏幕上？
+- 设备屏幕尺寸和DPI是多大？一个xhdpi的设备相对于低dpi的设备会需要更大的缓存来在内存中hold相同数量的图片。
+- bitmaps的尺寸和配置是什么样的？每个bitmap会占据多大内存？
+- 图片会被访问多频繁？会不会有一些比其他的访问更频繁？如果是，也许你应该保持特定项在一直在内存里，或使用多个LruCache对象来应对不同组bitmaps。
+- 你能权衡质量和数量么(balance quality against quantity)？有时候存储大量低质量的bitmaps更有用，潜在地(potentially)在后台任务中再加载高质量的版本。
+没有特定的尺寸或者公式能适配所有app，取决于你来分析使用情况并做出合适的方案。太小的cache可能导致毫无好处的额外开支(overhead)，太大的cache可能导致OOM，并让app所剩内存无几。示例：
+```
+private LruCache<String, Bitmap> mMemoryCache;
+
+@Override
+protected void onCreate(Bundle savedInstanceState) {
+    ...
+    // Get max available VM memory, exceeding this amount will throw an
+    // OutOfMemory exception. Stored in kilobytes as LruCache takes an
+    // int in its constructor.
+    final int maxMemory = (int) (Runtime.getRuntime().maxMemory() / 1024);
+
+    // Use 1/8th of the available memory for this memory cache.
+    final int cacheSize = maxMemory / 8;
+
+    mMemoryCache = new LruCache<String, Bitmap>(cacheSize) {
+        @Override
+        protected int sizeOf(String key, Bitmap bitmap) {
+            // The cache size will be measured in kilobytes rather than
+            // number of items.
+            return bitmap.getByteCount() / 1024;
+        }
+    };
+    ...
+}
+
+public void addBitmapToMemoryCache(String key, Bitmap bitmap) {
+    if (getBitmapFromMemCache(key) == null) {
+        mMemoryCache.put(key, bitmap);
+    }
+}
+
+public Bitmap getBitmapFromMemCache(String key) {
+    return mMemoryCache.get(key);
+}
+```
+这个例子中，1/8的app内存分配给(allocated for)缓存，在一个普通的hdpi的设备，这是大概4MB的最小值(a minimum of around 4MB)，（32/8=4）
+所以这大概能在内存里缓存2.5页的图片。当加载bitmap到imageview中时，LruCache先被检查。如果入口找到了，那么会立刻使用来更新imageview，否则会产生一个后台线程来处理图片：
+```
+public void loadBitmap(int resId, ImageView imageView) {
+    final String imageKey = String.valueOf(resId);
+
+    final Bitmap bitmap = getBitmapFromMemCache(imageKey);
+    if (bitmap != null) {
+        mImageView.setImageBitmap(bitmap);
+    } else {
+        mImageView.setImageResource(R.drawable.image_placeholder);
+        BitmapWorkerTask task = new BitmapWorkerTask(mImageView);
+        task.execute(resId);
+    }
+}
+```
+BitmapWorkerTask也需要更新以增加入口(entries)到内存缓存中：
+```
+class BitmapWorkerTask extends AsyncTask<Integer, Void, Bitmap> {
+    ...
+    // Decode image in background.
+    @Override
+    protected Bitmap doInBackground(Integer... params) {
+        final Bitmap bitmap = decodeSampledBitmapFromResource(
+                getResources(), params[0], 100, 100));
+        addBitmapToMemoryCache(String.valueOf(params[0]), bitmap);
+        return bitmap;
+    }
+    ...
+}
+```
+
+memory cache对于提升访问最近的bitmaps速度来说非常有用，但是你不能依赖这个方法。像GridView这样带有大量数据源的控件可以轻松填满内存空间。你的app不能被另一个任务比如电话打断，而且在后台时它可能就被干掉，然后内存缓存就会被销毁。一旦用户恢复了，a你又不得不再次处理每个图片。磁盘缓存(disk cache)就适用于这些情况，它能持久保存(persist)处理后的bitmaps，并在图片不再在内存中可用的时候减少加载事迹。当然从磁盘解析图片要比从内存中慢。而且应该在后台搞定，因为磁盘读取时间是不可预测的。
+如果需要更频繁地访问，也许ContentProvider是个存储缓存的更佳地点。比如图片浏览app。
+下面代码演示了添加disk cache到已经存在的memory cache中：
+```
+private DiskLruCache mDiskLruCache;
+private final Object mDiskCacheLock = new Object();
+private boolean mDiskCacheStarting = true;
+private static final int DISK_CACHE_SIZE = 1024 * 1024 * 10; // 10MB
+private static final String DISK_CACHE_SUBDIR = "thumbnails";
+
+@Override
+protected void onCreate(Bundle savedInstanceState) {
+    ...
+    // Initialize memory cache
+    ...
+    // Initialize disk cache on background thread
+    File cacheDir = getDiskCacheDir(this, DISK_CACHE_SUBDIR);
+    new InitDiskCacheTask().execute(cacheDir);
+    ...
+}
+
+class InitDiskCacheTask extends AsyncTask<File, Void, Void> {
+    @Override
+    protected Void doInBackground(File... params) {
+        synchronized (mDiskCacheLock) {
+            File cacheDir = params[0];
+            mDiskLruCache = DiskLruCache.open(cacheDir, DISK_CACHE_SIZE);
+            mDiskCacheStarting = false; // Finished initialization
+            mDiskCacheLock.notifyAll(); // Wake any waiting threads
+        }
+        return null;
+    }
+}
+
+class BitmapWorkerTask extends AsyncTask<Integer, Void, Bitmap> {
+    ...
+    // Decode image in background.
+    @Override
+    protected Bitmap doInBackground(Integer... params) {
+        final String imageKey = String.valueOf(params[0]);
+
+        // Check disk cache in background thread
+        Bitmap bitmap = getBitmapFromDiskCache(imageKey);
+
+        if (bitmap == null) { // Not found in disk cache
+            // Process as normal
+            final Bitmap bitmap = decodeSampledBitmapFromResource(
+                    getResources(), params[0], 100, 100));
+        }
+
+        // Add final bitmap to caches
+        addBitmapToCache(imageKey, bitmap);
+
+        return bitmap;
+    }
+    ...
+}
+
+public void addBitmapToCache(String key, Bitmap bitmap) {
+    // Add to memory cache as before
+    if (getBitmapFromMemCache(key) == null) {
+        mMemoryCache.put(key, bitmap);
+    }
+
+    // Also add to disk cache
+    synchronized (mDiskCacheLock) {
+        if (mDiskLruCache != null && mDiskLruCache.get(key) == null) {
+            mDiskLruCache.put(key, bitmap);
+        }
+    }
+}
+
+public Bitmap getBitmapFromDiskCache(String key) {
+    synchronized (mDiskCacheLock) {
+        // Wait while disk cache is started from background thread
+        while (mDiskCacheStarting) {
+            try {
+                mDiskCacheLock.wait();
+            } catch (InterruptedException e) {}
+        }
+        if (mDiskLruCache != null) {
+            return mDiskLruCache.get(key);
+        }
+    }
+    return null;
+}
+
+// Creates a unique subdirectory of the designated app cache directory. Tries to use external
+// but if not mounted, falls back on internal storage.
+public static File getDiskCacheDir(Context context, String uniqueName) {
+    // Check if media is mounted or storage is built-in, if so, try and use external cache dir
+    // otherwise use internal cache dir
+    final String cachePath =
+            Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState()) ||
+                    !isExternalStorageRemovable() ? getExternalCacheDir(context).getPath() :
+                            context.getCacheDir().getPath();
+
+    return new File(cachePath + File.separator + uniqueName);
+}
+```
+纵使初始化磁盘缓存需要磁盘操作，因此不应该发生在主线程，但是捏，这并不代表缓存在初始化之前不可访问。为了处理这个，上面的实现中，一个锁对象确保了直到缓存被初始化app不从磁盘缓存中读取。相比内存缓存在UI线程被检查后，磁盘缓存在后台被检查。磁盘操作绝对不该在主线进行。(Disk operations should never take place on the UI thread.) 当图片处理完成后，最终的bitmap被加到内存和磁盘缓存以便未来的使用。
+
+>Luckily, you have a nice memory cache of bitmaps that you built in the Use a Memory Cache section. This cache can be passed through to the new activity instance using a Fragment which is preserved by calling setRetainInstance(true)). After the activity has been recreated, this retained Fragment is reattached and you gain access to the existing cache object, allowing images to be quickly fetched and re-populated into the ImageView objects.
+
+运行时的配置改变比如屏幕方向改变，导致android销毁并restart activity以应用新配置。你肯定想避免不得不重新处理所有图片以让用户有平滑、快速的体验。幸运的是，你拥有了建立好的bitmap的内存缓存。这个缓存可以传到新的activity实例，使用由于调用了`setRetainInstance(true)`被保存的fragment。activity被重建后，保留的fragment会被重新attach，然后你可以访问已经存在的cache对象，这可以让图片快速解析并populate到UI中。下面是使用fragment的例子：
+```
+private LruCache<String, Bitmap> mMemoryCache;
+
+@Override
+protected void onCreate(Bundle savedInstanceState) {
+    ...
+    RetainFragment retainFragment =
+            RetainFragment.findOrCreateRetainFragment(getFragmentManager());
+    mMemoryCache = retainFragment.mRetainedCache;
+    if (mMemoryCache == null) {
+        mMemoryCache = new LruCache<String, Bitmap>(cacheSize) {
+            ... // Initialize cache here as usual
+        }
+        retainFragment.mRetainedCache = mMemoryCache;
+    }
+    ...
+}
+
+class RetainFragment extends Fragment {
+    private static final String TAG = "RetainFragment";
+    public LruCache<String, Bitmap> mRetainedCache;
+
+    public RetainFragment() {}
+
+    public static RetainFragment findOrCreateRetainFragment(FragmentManager fm) {
+        RetainFragment fragment = (RetainFragment) fm.findFragmentByTag(TAG);
+        if (fragment == null) {
+            fragment = new RetainFragment();
+            fm.beginTransaction().add(fragment, TAG).commit();
+        }
+        return fragment;
+    }
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setRetainInstance(true);
+    }
+}
+```
+测试的话，可以用retain，然后不retain，看看旋转屏幕的反应。你会注意到几乎没啥延迟，当你保持了cache的时候(You should notice little to no lag as the images populate the activity almost instantly from memory when you retain the cache.)。内存缓存找不到的图片最好要在disk里面能找到，不然就会正常处理。
