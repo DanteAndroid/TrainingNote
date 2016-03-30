@@ -1582,3 +1582,7 @@ class RetainFragment extends Fragment {
 }
 ```
 测试的话，可以用retain，然后不retain，看看旋转屏幕的反应。你会注意到几乎没啥延迟，当你保持了cache的时候(You should notice little to no lag as the images populate the activity almost instantly from memory when you retain the cache.)。内存缓存找不到的图片最好要在disk里面能找到，不然就会正常处理。
+
+android3.0之后，引入了`BitmapFactory.Options.inBitmap`成员，如果设了这个选项，使用这个Options对象的编码方法在加载内容时会尝试重用已经存在的bitmap。这意味着bitmap的内存会被复用，因此提升性能。接下来不翻译了。。[Managing Bitmap Memory](http://developer.android.com/intl/zh-cn/training/displaying-bitmaps/manage-memory.html)
+
+这节课把之前的融合到一起，告诉你如何在后台线程加载多个bitmap到ViewPager和GridView并缓存bitmap，同时处理了并发和配置改变。滑动的view模式是一个导航图片库的详情的极佳方式。你可以通过使用由PagerAdapter支持的ViewPager来实现。但是捏，更爽的支持adapter(backing adapter)是用`FragmentStateAdapter`的子类
