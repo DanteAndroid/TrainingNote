@@ -1603,3 +1603,5 @@ android包含了*transitions*框架，这可以让你在不同的view树之间�
 - 内置动画：包括定义好的常见的特效比如淡入，移动
 - 支持资源文件：从layout资源文件加载view树和内置动画
 - 生命周期回调：定义了提供对animation和树变化过程的精确控制的回调(Defines callbacks that provide finer control over the animation and hierarchy change process.)
+
+框架对所有俩view树种的views的改变进行了动画。一个view树可能简单的只有一个view，也可能复杂地有一个ViewGroup包含一组精密的views。
