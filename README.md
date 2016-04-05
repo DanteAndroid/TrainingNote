@@ -1604,4 +1604,23 @@ android包含了*transitions*框架，这可以让你在不同的view树之间�
 - 支持资源文件：从layout资源文件加载view树和内置动画
 - 生命周期回调：定义了提供对animation和树变化过程的精确控制的回调(Defines callbacks that provide finer control over the animation and hierarchy change process.)
 
-框架对所有俩view树种的views的改变进行了动画。一个view树可能简单的只有一个view，也可能复杂地有一个ViewGroup包含一组精密的views。
+>The transitions framework provides abstractions for scenes, transitions, and transition managers. These are described in detail in the following sections. To use the framework, you create scenes for the view hierarchies in your app that you plan to change between. Next, you create a transition for each animation you want to use. To start the animation between two view hierarchies, you use a transition manager specifying the transition to use and the ending scene. This procedure is described in detail in the remaining lessons in this class.'
+
+框架对所有俩view树种的views的改变进行了动画。一个view树可能简单的只有一个view，也可能复杂地有一个ViewGroup包含一组精密的views。框架通过改变从开始view树到最终view树之间随着时间，改变一个或者更多属性值来动画每个view。transitions框架与view树和动画相关联。框架的目的就是存储view树的状态，在这些树之间改变以修改设备屏幕外观，并通过存储和应用动画描述(animation definitions)来动画这种改变。
+
+一个存储view树的场景，包括所有的view和其属性值。一个view树可以是简单的view或者复杂的views和子布局。在场景里存储views树状态使你可以把它转换到另一个场景。transition框架允许你从布局资源文件或者代码里的ViewGroup对象创建场景(Scene)。如果需要动态创建view树或者运行时修改它，在代码里创建场景就很实用。
+
+大多数情况下(In most cases)你不需要明显地(explicitly)创建一个开始场景。如果你已经应用了一个transition，框架会用之前的结束场景作为接下来transition的开启场景。如果你没有，框架会收集当前屏幕上views的状态信息。一个场景可以定义自己的，当场景改变时的动作。这个特性在你transition到一个场景时清理view的设置很有用。(this feature is useful for cleaning up view settings after you transition to a scene.)
+除了view树和属性值，场景还可以存储view树的父类引用。这个root view叫scene root。影响到场景的场景和动画的改变发生在scene root内。
+
+transition框架中，动画创建了一系列描绘了开始和结束场景之间的改变的帧画面(frame)。关于动画的信息存储在transition对象中。为了开启动画，你得用一个`TransitionManager`实例来应用transition。框架可以在俩不同的场景，或者当前场景的不同状态间进行transition。
+
+框架包含了一系列内置的transitions以应付常用的动画特效，比如淡化(fading)和改变views的大小(resizing)。你还可以用动画框架的API来定义自己的transitions来创建动画特效。transition框架还让你能在一个包含一组独立的内置或者自定义的transitions的transition集合中组合不同的动画效果。(The transitions framework also enables you to combine different animation effects in a transition set that contains a group of individual built-in or custom transitions.)
+transition的生命周期与activity很类似，它代表了框架监视的开始和完成动画之间的transition的状态。在重要的生命周期状态上，框架调用了回调方法，你可以implement来对你UI在transition的不同阶段中进行调整。
+
+transition框架的限制(limitations)：
+- 应用到SurfaceView的动画可能无法正确显示。SurfaceView示例由非主线程更新，所以更新可以与其他view的动画不同步。
+- 某些特定transition类型应用到TextureView时可能无法产生预期的动画效果。
+- 继承AdapterView的类，比如ListView，管理子views的方式与transition框架不兼容，如果你想动画基于AdapterView的views，设备的显示可能会挂起(hang)
+- *如果你试图用动画来resize一个TextView，在它完全resized之前，文本可能会跳到一个新的位置。为了避免这个问题，不要动画包含文本的views。*
+
