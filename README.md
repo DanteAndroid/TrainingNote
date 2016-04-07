@@ -1624,3 +1624,141 @@ transition框架的限制(limitations)：
 - 继承AdapterView的类，比如ListView，管理子views的方式与transition框架不兼容，如果你想动画基于AdapterView的views，设备的显示可能会挂起(hang)
 - *如果你试图用动画来resize一个TextView，在它完全resized之前，文本可能会跳到一个新的位置。为了避免这个问题，不要动画包含文本的views。*
 
+你可以直接从布局文件创建一个`Scene`实例，当文件中的view树大多情况下是固定不变的时候你就可以这么做。这样的场景(The resulting scene)代表了你创建场景实例时的view树的状态。如果你改变了view树，你得重新创建场景。框架从文件中的整个view树创建了场景，而不能从其一部分来创建。
+为了从布局文件场景场景实例，用你布局的ViewGroup来解析根场景(scene root)，然后调用`Scene.getSceneForLayout()`，传入根场景和布局文件id。
+
+ 下面的代码展示了如何用相同的场景根元素来创建不同的两个场景。还演示了你可以不用暗示他们是有关联的来加载多个未关联的场景对象(you can load multiple unrelated Scene objects without implying that they are related to each other)。
+ 示例由下面的定义好的布局组成：
+ - 主布局是一个包含文本标签和子布局的activity的布局。
+ - 第一个场景是带有俩文本区域的相对(or相关？)布局
+ - 第二个场景的布局也有俩文本，但是顺序不同。
+ 示例特意这么设计这一所有的动画都能在activity的主布局的子布局中产生。主布局的文本保持不变。
+主布局长这个样子：
+res/layout/activity_main.xml
+```
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/master_layout">
+    <TextView
+        android:id="@+id/title"
+        ...
+        android:text="Title"/>
+    <FrameLayout
+        android:id="@+id/scene_root">
+        <include layout="@layout/a_scene" />
+    </FrameLayout>
+</LinearLayout>
+```
+这个布局包含一个文本和一个用来作为scene root的子布局。用于第一个场景的布局包括在主布局内。这使得app可以将它显示为初始界面并把它加载到场景中，因为框架只能把一整个布局文件加载到场景中。(The layout for the first scene is included in the main layout file. This allows the app to display it as part of the initial user interface and also to load it into a scene, since the framework can load only a whole layout file into a scene.)
+
+First scene的布局文件(被包括到主布局中了)：
+res/layout/a_scene.xml
+```
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/scene_container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent" >
+    <TextView
+        android:id="@+id/text_view1
+        android:text="Text Line 1" />
+    <TextView
+        android:id="@+id/text_view2
+        android:text="Text Line 2" />
+</RelativeLayout>
+```
+Second scene的布局也包括俩文本(id相同)但是摆放顺序不同：
+res/layout/another_scene.xml
+```
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/scene_container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent" >
+    <TextView
+        android:id="@+id/text_view2
+        android:text="Text Line 2" />
+    <TextView
+        android:id="@+id/text_view1
+        android:text="Text Line 1" />
+</RelativeLayout>
+```
+
+当你定义好俩相对布局后，你就可以分别获得scene对象了。这样使你之后可以在两种UI之间转换。为了获得场景，你需要一个根场景和布局id的引用。:
+```
+Scene mAScene;
+Scene mAnotherScene;
+
+// Create the scene root for the scenes in this app
+mSceneRoot = (ViewGroup) findViewById(R.id.scene_root);
+
+// Create the scenes
+mAScene = Scene.getSceneForLayout(mSceneRoot, R.layout.a_scene, this);
+mAnotherScene =
+    Scene.getSceneForLayout(mSceneRoot, R.layout.another_scene, this);
+```
+app中，现在有俩基于view树的Scene对象，他们都是用 res/layout/activity_main.xml中的`FrameLayout`元素定义的根场景。
+
+你也可以代码中由ViewGroup对象来创建Scene。当你需要直接修改view树或者需要动态生成时，你可以这么做。
+`Scene(sceneRoot, viewHierachy)`构造方法来从view树中创建场景。它跟Scene.getSceneForLayout()方法效果是一样一样的
+
+代码中创建scene的示例：
+```
+Scene mScene;
+
+// Obtain the scene root element
+mSceneRoot = (ViewGroup) mSomeLayoutElement;
+
+// Obtain the view hierarchy to add as a child of
+// the scene root when this scene is entered
+mViewHierarchy = (ViewGroup) someOtherLayoutElement;
+
+// Create a scene
+mScene = new Scene(mSceneRoot, mViewHierarchy);
+```
+框架可以让你定义进入或者退出场景时的场景动作。很多情况下，自定义场景动作都不是必须的，因为框架自动在场景间做出动画改变。
+Scene actions在这些情况很有用：动画不在同一个view树的views。你可以用退出和进入的场景动作来动画开启和结束场景的views；
+动画哪些transition框架不能自动动画的views。比如ListView对象。更多信息，看『[Limitations](http://developer.android.com/training/transitions/overview.html#Limitations)』
+为了提供自定义场景动作，把你的actions定义为Runnable对象，并传入Scene.setExitAction()或者setEnterAction()。框架会在运行transition动画之前在启动场景执行setExitAction，在运行完动画后在结束场景里执行setEnterAction(这里文档可能写的有问题，应该是执行其设定的Action而不是setXXAction这一方法)。注意：**不要**用场景动作来在开启和结束场景的**views间传数据**。
+
+这节课教你在俩场景之间，用内置的transition来移动，变大变小，淡化views。上一课中，你学会了怎么创建表示不同view树的状态的场景了。一旦你定义好开启和结束场景，你得创建一个定义了动画的`Transition`对象。框架允许你在资源文件中指定内置的transition，并在代码中填充它(inflate)，或者直接在代码里创建内置的transition实例。
+
+    Class       |  Tag|    Attributes| Effect
+---------------|-----|--------------|-------
+AutoTransition |<autoTransition/>|-|默认transition. 淡出，移动，调整大小，淡入views，这个顺序。
+Fade|<fade/>|android:fadingMode="[fade_in| fade_out| fade_in_out]"|fade_in_out (default) 先淡出后淡入。
+ChangeBounds|<changeBounds/>|-|移动并调整views大小。
+
+从资源文件创建transition实例。这招可以让你不用改activity的代码就能修改你的transition定义。对于从你app代码中分离复杂的transition定义也很有用。
+在资源文件中指定内置的transition，按照这个步骤：
+1. 在项目中加入`res/transition`文件夹
+2. 在这个文件夹中创建一个xml文件
+3. 为了内置的transition，加一个xml节点
+
+例如，下面的文件指定了Fade transition:
+res/transition/fade_transition.xml
+`<fade xmlns:android="http://schemas.android.com/apk/res/android" />`
+然后你得在activity里填充(inflate)这个transition示例：
+```
+Transition mFadeTransition =
+        TransitionInflater.from(this).
+        inflateTransition(R.transition.fade_transition);
+```
+这招对于动态创建transition对象很好用。如果你在代码里修改UI，并创建简单的参数很少或者没有的内置transition的话。
+为了创建内置transition的实例，调用transition子类的构造方法。比如： `Transition mFadeTransition = new Fade();`
+一般为了响应一个事件比如用户操作时你会应用transition来在不同views树之间改变。比如，假设有一个搜索app：用户输入搜索词汇点击搜索，app变为便是搜索结果的布局的场景，这时app淡出搜索按钮，淡入搜索结果的transition。
+当你为了响应activity的某些事件而做出场景的变化时，调用`TransitionManager.go()`静态方法传入结束场景和用于动画的transition实例：`TransitionManager.go(mEndingScene, mFadeTransition);`框架会用结束场景的view树来改变根场景内的view树，同时应用transition实例指定的animation。开始场景就是上个transition的结束场景。如果没有，开启场景就会自动选择UI的当前状态。
+如果你没指定transition实例，transition管理器可以应用一个自动会在大多数合理处理的transition（an automatic transition that does something reasonable for most situations）。
+
+框架默认应用transition到开启和结束场景中所有的views上。某些情况你可能只想应用到场景的一部分views中。比如，框架不支持应用动画到ListView对象，所以你不该试着在transition中动画他们。框架允许你选择你想动画的特定views。每个transition动画的view都是一个`target`，你只能选择与场景关联的view树的view作为target。为了移除/增加target表中的view，在开启transition之前调用add/removeTarget()即可。 
+
+为了从animation获得最大的效果(get the most impact from an animation)，你应该将其匹配到场景的改变的类型(match it to the type of changes that occur between the scenes)。比如，如果你在场景间移除并添加了一些views，一个淡入淡出动画提供了很好的暗示表示一些views不再存在。如果你在屏幕移动views到不同的地方，动画移动过程可能是更好的选择，因为这样用户能注意到views的新地点。
+
+没必要只选一个动画，因为transition框架允许你在一个包含一组独立的transition的集合中，组合动画特效。
+为了在xml中从一组transition集合中定义一个transition set，在`res/transitions/`文件夹下创建资源文件，并罗列所有transitions在`transisiotnSet`元素下。比如下面代码展示如何制定一个与AutoTransition类有相同行为的transition集合。
+```
+<transitionSet xmlns:android="http://schemas.android.com/apk/res/android"
+    android:transitionOrdering="sequential">
+    <fade android:fadingMode="fade_out" />
+    <changeBounds />
+    <fade android:fadingMode="fade_in" />
+</transitionSet>
+```
+用`TransitionInflater.from()`来填充为TransitionSet对象。它继承自Transition
