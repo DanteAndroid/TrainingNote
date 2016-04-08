@@ -13,6 +13,7 @@
     1. [Display Bitmaps Efficiently](#display-bitmaps-efficiently)
     2. [Animating Views Using Scenes and Transitions](#animating-views–using–scenes–and-transitions)
     3. [Adding Animations](#adding-animations)
+    
 ---
 ##Getting started
 
