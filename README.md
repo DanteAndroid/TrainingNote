@@ -1761,4 +1761,119 @@ Transition mFadeTransition =
     <fade android:fadingMode="fade_in" />
 </transitionSet>
 ```
-用`TransitionInflater.from()`来填充为TransitionSet对象。它继承自Transition
+用`TransitionInflater.from()`来填充为TransitionSet对象。它继承自Transition，这样就像其他transition实例一样，你可以通过transition manager来用它。
+
+改变view树不是修改UI的唯一方法。你还可以在当前树内通过修改、添加，移除子views来做出改变。比如你可以只用一个layout就实现搜索交互。通过带一个搜索框和搜索icon的layout开始，为了改变UI来展示结果，当用户点击搜索按钮的时候，通过`ViewGroup.removeView()`方法来移除按钮，然后通过`ViewGroup.addView()`来添加搜索结果。如果是俩几乎相同的view树，那么你可能想用这个方法。比起为了UI上小小的区别不得不创建和维护俩独立的layout文件，显然在代码里修改包含一个view树的一个layout文件比较方便。
+如果你用这个方法(in this fashion)在当前view树中做出改变，就不需要创建一个scene。作为替代，你可以在view树的俩状态间使用一个delayed transition。这个transitions framework的特性由当前的view树的状态开始，记录了你对views做出的changes，然后当系统重绘UI时应用动画了这些改变的transition。
+
+在一个view树内创建延迟transition，按照这个步骤：
+1. 当触发transition时，调用TransitionManager.beginDelayedTransition()方法，传入你要改变的views的父view(providing the parent view of all the views you want to change and the transition to use.)框架会存储当前子views的状态和属性值。
+2. 按照需要对子views做出变化，框架会记录这些改变和他们的属性值。
+3. 当系统根据你的改变重绘UI时，框架会根据初始和新状态来动画这些改变。
+下面演示使用delayed transition如何动画textview添加到一个view树：
+res/layout/activity_main.xml
+```
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/mainLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent" >
+    <EditText
+        android:id="@+id/inputText"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentTop="true"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+    ...
+</RelativeLayout>
+```
+MainActivity.java
+```
+private TextView mLabelText;
+private Fade mFade;
+private ViewGroup mRootView;
+...
+
+// Load the layout
+this.setContentView(R.layout.activity_main);
+...
+
+// Create a new TextView and set some View properties
+mLabelText = new TextView();
+mLabelText.setText("Label").setId("1");
+
+// Get the root view and create a transition
+mRootView = (ViewGroup) findViewById(R.id.mainLayout);
+mFade = new Fade(IN);
+
+// Start recording changes to the view hierarchy
+TransitionManager.beginDelayedTransition(mRootView, mFade);
+
+// Add the new TextView to the view hierarchy
+mRootView.addView(mLabelText);
+
+// When the system redraws the screen to show this update,
+// the framework will animate the addition as a fade in
+```
+
+transition的生命周期跟activity有点像，它代表了框架从TransitionManager.go()到动画完成之间的transition状态。在重要的生命周期状态时，框架会调用通过`TransitionListener`接口定义的回调。transition生命周期回调挺有用的。比如，从开始vie树复制一个view的property到结束view树。你并不能简单地复制，因为结束的view树直到动完成后才被inflated。Instead，你得存到一个变量中，然后等框架完成transition后复制到结束的view树中(在activity中实现`TransitionListener.onTransitionEnd()`)。
+
+创建自定义的transition，例如，你可以定义一个transition使text的前景色(foreground color)和输入框变成灰色(暗示它在新场景中已经不可用)自定义的transition就像内置类型的一样，会应用动画到开启和结束场景中的子view。但是，你得提供**获取属性值和生成动画**的代码。你可能还想为你的animation定义一个target views的子集。自定义的transition长这个样子：
+```
+public class CustomTransition extends Transition {
+    @Override
+    public void captureStartValues(TransitionValues values) {}
+
+    @Override
+    public void captureEndValues(TransitionValues values) {}
+
+    @Override
+    public Animator createAnimator(ViewGroup sceneRoot,
+                                   TransitionValues startValues,
+                                   TransitionValues endValues) {}
+}
+```
+
+transition的动画使用的是Property Animation。它会在特定的内一段时间改变一个view属性(Property animations change a view property between a starting and ending value over a specified period of time)，这样框架就需要这个属性的开始值和结束值来构建animation。
+但是捏，property animation通常只需要所有view的属性值的一个子集(a small subset of all the view's property values)比如，一个颜色动画需要颜色属性值，而移动动画只需要位置属性值。因此框架不提供全部的属性值给一个transition。Instead, 框架调用回调方法，在里面可以让transition获取它需要的属性值并存储到框架中。
+
+为了传递开始view的值给框架，实现captureStartValues(transitionValues)方法即可。框架在开始场景中为每个view调用这个方法。其参数是一个TransitinoValue对象，它包含了对view的引用和一个Map对象，in which你可以存储你需要的view值。在你的实现中，取回(retrieve)这些属性值并通过存在map中来传递给框架。为了确保属性值的key不会和其他TransitionValues的key冲突，遵循这个命名规则： `package_name:transition_name:property_name`，下面是实现captureStartValues方法的实例：
+```
+public class CustomTransition extends Transition {
+
+    // Define a key for storing a property value in
+    // TransitionValues.values with the syntax
+    // package_name:transition_class:property_name to avoid collisions
+    private static final String PROPNAME_BACKGROUND =
+            "com.example.android.customtransition:CustomTransition:background";
+
+    @Override
+    public void captureStartValues(TransitionValues transitionValues) {
+        // Call the convenience method captureValues
+        captureValues(transitionValues);
+    }
+
+
+    // For the view in transitionValues.view, get the values you
+    // want and put them in transitionValues.values
+    private void captureValues(TransitionValues transitionValues) {
+        // Get a reference to the view
+        View view = transitionValues.view;
+        // Store its background property in the values map
+        transitionValues.values.put(PROPNAME_BACKGROUND, view.getBackground());
+    }
+    ...
+}
+```
+同样低，框架会在结束场景为每个target view调用captureEndValues(TransitionValues)：
+```
+@Override
+public void captureEndValues(TransitionValues transitionValues) {
+    captureValues(transitionValues);
+}
+```
+这个例子，captureStartValues和xxxEndXXXX都调用captureValues放阿飞来获取并存储values。这个方法获取的view属性是相同的，但是在开始和结束场景中的值是不同的。框架为开始和结束状态的view保留了不同的maps。
+
+为了给开始和结束场景中view的状态变化以动画特效，你得复写createAnimator方法来提供一个animator。当框架调用这个方法时，它在sceene root 中传递view和TransitionValues对象(包含了你capture的开始和结束值)。
+框架调用createAnimator()方法的次数取决于发生在开始和结束场景间的变化情况。例如，假设一个淡入淡出动画被实现为自定义transition，如果开始场景有5个（2个结束时被移除）targets，结束场景有3个开始场景中的target，和一个新增的target，框架就会调用6次createAnimator：3次调用淡出和淡入的两边场景都有的targets，2次调用移除的targets的动画，还有一次新target的淡入动画。
+对于两遍都存在的target views，框架提供了TransitionValues对象给startValues和endValues参数。。对于只存在开始或者结束场景的views，只要把相应的参数改为null即可。
+创建自定义transition的时候，实现`createAnimator(ViewGroup, TransitionValues, TransitionValues) `方法，使用你获得的view属性值来创建animator对象并返回给框架。具体实例可以看看[CustomTransition](http://developer.android.com/samples/CustomTransition/index.html)；关于属性动画可以看[PropertyAnimation](http://developer.android.com/guide/topics/graphics/prop-animation.html)。
