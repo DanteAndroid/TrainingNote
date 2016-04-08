@@ -895,6 +895,8 @@ void handleSendMultipleImages(Intent intent) {
 
 ---
 
+[回到顶部](#menu)
+
 ## Multimedia
 
 ### Manage Audio Playback
