@@ -7,12 +7,12 @@
     5. [Working with System Permissions](working-with-system-permissions)
 2. [Content Sharing](#content-sharing)
 2. [Multimedia](#multimedia)
-    1. [Manage Audio Playback](manage-audio-playback)
-    2. [Capturing Photos](capturing-photos)
+    1. [Manage Audio Playback](#manage-audio-playback)
+    2. [Capturing Photos](#capturing-photos)
 3. [Graphics & Animation](#graphics-&-animation)
-    1. [Display Bitmaps Efficiently](display-bitmaps-efficiently)
-    2. [Animating Views Using Scenes and Transitions](animating-views–using–scenes–and-transitions)
-    3. [Adding Animations](adding-animations)
+    1. [Display Bitmaps Efficiently](#display-bitmaps-efficiently)
+    2. [Animating Views Using Scenes and Transitions](#animating-views–using–scenes–and-transitions)
+    3. [Adding Animations](#adding-animations)
 ---
 ##Getting started
 
