@@ -1596,7 +1596,7 @@ android3.0之后，引入了`BitmapFactory.Options.inBitmap`成员，如果设�
 android框架提供了大量标准工具来创建吸引人的，功能多样的图像界面。但是，如果你想要对你app在屏幕上绘制的东西有更多的控制，或者想到3d图像里探险，你需要使用一种与众不同的东西。Android框架提供的OpenGL ES接口提供了一组用来显示高级的，动态图像，只有你想不到没有它做不到，而且还可以享受到很多设备上都有的图形处理单元加速(GPU)带来的好处
 这节课带你学习使用OpenGL进行开发的基础，包括配置、绘制对象、移动绘制元素和响应触摸输入。（比较高级，老规矩，不翻译）
 
-### Animating Views Using Scenes and Transitions
+## Animating Views Using Scenes and Transitions
 
 为了响应用户输入和其他事件，activity的ui经常会变化。比如包含用户可以输入查询的表格的activity可以当用户提交的时候隐藏这个表格并展现一个搜索结果的列表。这些情况下，为了提供视觉上的连贯，你可以在你的UI中的不同view树(hhierarchies)之间做出动画。这些动画给用户操作的反馈并且帮助他们理解你app是怎么工作的。
 android包含了*transitions*框架，这可以让你在不同的view树之间轻松生成动画。框架通过根据时间的变化改变他们的属性值来为views产生运行时的动画。框架内置常见的特效动画，并让你创建自定义动画和变化的生命周期回调(trnasition lifecycle callbacks)。
