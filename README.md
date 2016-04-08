@@ -1,5 +1,5 @@
 # Menu
-1. Getting started
+1. [Getting started](#getting-started)
     1. [Supporting Different Screens](#supporting-different-screens)
     2. [Managing the Activity Lifecycle](#managing-the-activity-lifecycle)
     3. [Building a Dynamic UI with Fragments](#building-a-dynamic-ui-with-fragments)
