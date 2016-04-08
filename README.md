@@ -1,8 +1,18 @@
 # Menu
 1. Getting started
-    1. [Supporting Different Screens](#Supporting-Different-Screens)
-    2. [Animating Views Using Scenes and Transitions](#animating-views-using-scenes-and-transitions)
-
+    1. [Supporting Different Screens](#supporting-different-screens)
+    2. [Managing the Activity Lifecycle](#managing-the-activity-lifecycle)
+    3. [Building a Dynamic UI with Fragments](#building-a-dynamic-ui-with-fragments)
+    4. [Interacting with Other Apps](interacting-with-other-apps)
+    5. [Working with System Permissions](working-with-system-permissions)
+2. [Content Sharing](#content-sharing)
+2. [Multimedia](#multimedia)
+    1. [Manage Audio Playback](manage-audio-playback)
+    2. [Capturing Photos](capturing-photos)
+3. [Graphics & Animation](#graphics-&-animation)
+    1. [Display Bitmaps Efficiently](display-bitmaps-efficiently)
+    2. [Animating Views Using Scenes and Transitions](animating-views–using–scenes–and-transitions)
+    3. [Adding Animations](adding-animations)
 ---
 ##Getting started
 
@@ -603,7 +613,7 @@ finish();` 这对于返回结果到你自己的app时很好用。因为这个res
 
 ***
 
-##Working with System Permissions
+### Working with System Permissions
 
 >To protect the system's integrity and the user's privacy, Android runs each app in a limited access sandbox. If the app wants to use resources or information of ites sandbox, the app has to explicitly request permission.
 为了保护系统完整性和用户隐私，android在一个有限权限的沙箱里运行每个app。如果这个app像用沙箱之外的资源、信息，就需要明确地申请权限。
@@ -846,7 +856,7 @@ void handleSendMultipleImages(Intent intent) {
     }
 ```
 
-###分享文件：
+###Sharing Files：
 
 为了安全地从分享文件给其他app，你得给文件配置一个安全的处理方法，以一个内容URI的形式。android的FileProvicer组件为文件生成了内容URI，基于你在XML文件中的详细定义。
 为你app定义FileProvider需要在manifest中定义一个入口(entry)，这个入口包含生成内容URI的授权信息，和XML的文件名（这个XML指定了你app能分享的目录）：
@@ -886,7 +896,7 @@ void handleSendMultipleImages(Intent intent) {
 
 ## Multimedia
 
-## Manage Audio Playback
+### Manage Audio Playback
 
 > A good user experience is a predictable one
 
@@ -1596,7 +1606,7 @@ android3.0之后，引入了`BitmapFactory.Options.inBitmap`成员，如果设�
 android框架提供了大量标准工具来创建吸引人的，功能多样的图像界面。但是，如果你想要对你app在屏幕上绘制的东西有更多的控制，或者想到3d图像里探险，你需要使用一种与众不同的东西。Android框架提供的OpenGL ES接口提供了一组用来显示高级的，动态图像，只有你想不到没有它做不到，而且还可以享受到很多设备上都有的图形处理单元加速(GPU)带来的好处
 这节课带你学习使用OpenGL进行开发的基础，包括配置、绘制对象、移动绘制元素和响应触摸输入。（比较高级，老规矩，不翻译）
 
-## Animating Views Using Scenes and Transitions
+### Animating Views Using Scenes and Transitions
 
 为了响应用户输入和其他事件，activity的ui经常会变化。比如包含用户可以输入查询的表格的activity可以当用户提交的时候隐藏这个表格并展现一个搜索结果的列表。这些情况下，为了提供视觉上的连贯，你可以在你的UI中的不同view树(hhierarchies)之间做出动画。这些动画给用户操作的反馈并且帮助他们理解你app是怎么工作的。
 android包含了*transitions*框架，这可以让你在不同的view树之间轻松生成动画。框架通过根据时间的变化改变他们的属性值来为views产生运行时的动画。框架内置常见的特效动画，并让你创建自定义动画和变化的生命周期回调(trnasition lifecycle callbacks)。
@@ -1881,3 +1891,5 @@ public void captureEndValues(TransitionValues transitionValues) {
 框架调用createAnimator()方法的次数取决于发生在开始和结束场景间的变化情况。例如，假设一个淡入淡出动画被实现为自定义transition，如果开始场景有5个（2个结束时被移除）targets，结束场景有3个开始场景中的target，和一个新增的target，框架就会调用6次createAnimator：3次调用淡出和淡入的两边场景都有的targets，2次调用移除的targets的动画，还有一次新target的淡入动画。
 对于两遍都存在的target views，框架提供了TransitionValues对象给startValues和endValues参数。。对于只存在开始或者结束场景的views，只要把相应的参数改为null即可。
 创建自定义transition的时候，实现`createAnimator(ViewGroup, TransitionValues, TransitionValues) `方法，使用你获得的view属性值来创建animator对象并返回给框架。具体实例可以看看[CustomTransition](http://developer.android.com/samples/CustomTransition/index.html)；关于属性动画可以看[PropertyAnimation](http://developer.android.com/guide/topics/graphics/prop-animation.html)。
+
+### Adding Animations
