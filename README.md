@@ -1,4 +1,8 @@
-# TrainingNote
+# Menu
+1. Getting started
+    1. [Supporting Different Screens](Supporting Different Screens)
+    2. [Animating Views Using Scenes and Transitions](Animating Views Using Scenes and Transitions)
+
 ---
 ##Getting started
 
