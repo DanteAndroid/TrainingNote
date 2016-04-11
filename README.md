@@ -1896,3 +1896,106 @@ public void captureEndValues(TransitionValues transitionValues) {
 创建自定义transition的时候，实现`createAnimator(ViewGroup, TransitionValues, TransitionValues) `方法，使用你获得的view属性值来创建animator对象并返回给框架。具体实例可以看看[CustomTransition](http://developer.android.com/samples/CustomTransition/index.html)；关于属性动画可以看[PropertyAnimation](http://developer.android.com/guide/topics/graphics/prop-animation.html)。
 
 ### Adding Animations
+
+动画添加了细微的视觉线索，可以通知用户你app是啥情况并且提高对你app界面的认知(mental model of your app's inteerface)。动画在屏幕状态改变时尤其有用，比如加载内容或者新操作可用时。动画还能增加你app的颜值，给你app一种高大上的赶脚(a higher quality feel)。请记住，过度使用动画或者不合时宜地使用都可能是有害的，比如他们可用造成延迟。
+
+淡入淡出（crossfading）动画（又叫溶解dissolve）逐渐地淡出一个UI控件，同步地(simultaneously)淡入另外一个控件。这个动画在你想切换内容或者views时很实用。Crossfades非常细微、短暂，但是提供了从一个屏幕到下一个的流畅转换。不管怎么说，如果你不用它，转换就感觉很急促、突然。
+
+创建你想crossfade的俩views，示例中包含了一个progress指示器和一个可滚动的textview：
+```
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+        android:id="@+id/content"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <TextView style="?android:textAppearanceMedium"
+            android:lineSpacingMultiplier="1.2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/lorem_ipsum"
+            android:padding="16dp" />
+
+    </ScrollView>
+
+    <ProgressBar android:id="@+id/loading_spinner"
+        style="?android:progressBarStyleLarge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center" />
+
+</FrameLayout>
+```
+设置动画：
+1. 为你想crossfade的views创建成员变量。之后在动画过程中改动views时会用上这些引用。
+2. 对即将要淡入的view，设置可见性为GONE。这防止view占据布局空间，还能从布局计算中剔除，加快了处理速度。
+3. 在一个成员变量中缓存`config_shortAnimTime`系统属性。这个属性为动画定义了标准的"short"持续时间。这个持续时间对于轻微的或者频繁的动画很适合。（如果你想用的话，config_longAnimTime, config_mediumAnimTime也可以）
+用之前的layout作为activity的content view:
+```
+public class CrossfadeActivity extends Activity {
+
+    private View mContentView;
+    private View mLoadingView;
+    private int mShortAnimationDuration;
+
+    ...
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_crossfade);
+
+        mContentView = findViewById(R.id.content);
+        mLoadingView = findViewById(R.id.loading_spinner);
+
+        // Initially hide the content view.
+        mContentView.setVisibility(View.GONE);
+
+        // Retrieve and cache the system's default "short" animation time.
+        mShortAnimationDuration = getResources().getInteger(
+                android.R.integer.config_shortAnimTime);
+    }
+```
+views准备好后，通过下面的步骤来crossfade:
+1. 对于要淡入的view，把alpha值设为0，可见性设为VISIBLE(一开始是GONE)，这会让view可见，但是完全透明。
+2. 对于要淡入的view，动画它的alpha值使他从0到1。与此同时，对于要淡出的view，alpha值从1到0.
+3. 在`Animator.AnimatorListener`中用`OnAnimationEnd()`方法，把淡出的view的可见性设为GONE。尽管其alpha值是0，设为GONE后可以防止其占据空间和布局计算。
+```
+private View mContentView;
+private View mLoadingView;
+private int mShortAnimationDuration;
+...
+
+private void crossFade(){
+    // Set the content view to 0% opacity but visible, so that it is visible
+    // (but fully transparent) during the animation.
+    mContentView.setAlpha(0f);
+    mContentView.setVisibility(View.VISIBLE);
+    
+    // Animate the content view to 100% opacity, and clear any animation
+    // listener set on the view.
+    mContentView.animate()
+            .alpha(1f)
+            .setDurartion(mShortAnimationDuration)
+            .setListener(null);
+    
+    // Animate the loading view to 0% opacity. After the animation ends,
+    // set its visibility to GONE as an optimization step (it won't
+    // participate in layout passes, etc.)
+    mLoadingView.animate()
+            .alpha(0f)
+            .setDuration(mShortAnimationDuration)
+            .setListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    mLoadingView.setVisibility(View.GONE);
+                }
+            });
+}
+
+```
+（吐槽：只不过想搞个淡入淡出，这么麻烦？）
+
