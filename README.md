@@ -13,6 +13,9 @@
     1. [Display Bitmaps Efficiently](#display-bitmaps-efficiently)
     2. [Animating Views Using Scenes and Transitions](#animating-views–using–scenes–and-transitions)
     3. [Adding Animations](#adding-animations)
+4. [Connectivity & the Cloud](connectivity-&-the-cloud)
+    1. [Transferring Data Without Draining the Battery](transferring–data–without–draining-the-battery)
+
     
 ---
 ##Getting started
@@ -1999,3 +2002,642 @@ private void crossFade(){
 ```
 （吐槽：只不过想搞个淡入淡出，这么麻烦？）
 
+屏幕滑动是一种在完整屏幕间切换的常见的transition，例如app导航教程(setup wizards)、幻灯片(slideshows)。
+
+创建你之后会用于fragment内容的layout，另外还得为其内容定义一个string：
+```
+<!-- fragment_screen_slide_page.xml -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/content"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent" >
+
+    <TextView style="?android:textAppearanceMedium"
+        android:padding="16dp"
+        android:lineSpacingMultiplier="1.2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/lorem_ipsum" />
+</ScrollView>
+```
+创建一个Fragment类，在其onCreateView()中返回刚刚创建的layout。然后你可以在父activity中随时需要想给用户展示的时候创建fragment的实例。
+ViewPager有内置的滑动手势来对应pages的转换，默认会显示屏幕滑动动画，所以你不需要创建动画。ViewPager用PagerAdapter来为新pages的显示提供支持(supply)，所以PagerAdapter会用到你之前创建的fragment类。
+
+要开始的话，创建一个包含ViewPager的layout：
+```
+<!-- activity_screen_slide.xml -->
+<android.support.v4.view.ViewPager
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/pager"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent" />
+```
+创建满足下面条件的activity：
+- 设置content view为带有pager的布局。
+- 创建继承`FragmentStatePagerAdapter`的类，实现`getItem()`方法来提供屏幕滑动Fragment的实例作为新的页面。这个adapter还要求实现getCount()，which返回了adapter会创建的pages的数量。
+- 将PagerAdapter与ViewPager连接(Hook up)。
+- 通过在fragments的虚拟栈(stack)中向后移动(move backwards)来处理设备的返回键 。如果用户在第一个page，在activity的回退栈中返回。
+```
+import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentManager;
+...
+public class ScreenSlidePagerActivity extends FragmentActivity {
+    /**
+     * The number of pages (wizard steps) to show in this demo.
+     */
+    private static final int NUM_PAGES = 5;
+
+    /**
+     * The pager widget, which handles animation and allows swiping horizontally to access previous
+     * and next wizard steps.
+     */
+    private ViewPager mPager;
+
+    /**
+     * The pager adapter, which provides the pages to the view pager widget.
+     */
+    private PagerAdapter mPagerAdapter;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_screen_slide);
+
+        // Instantiate a ViewPager and a PagerAdapter.
+        mPager = (ViewPager) findViewById(R.id.pager);
+        mPagerAdapter = new ScreenSlidePagerAdapter(getSupportFragmentManager());
+        mPager.setAdapter(mPagerAdapter);
+    }
+    @Override
+    public void onBackPressed() {
+        if (mPager.getCurrentItem() == 0) {
+            // If the user is currently looking at the first step, allow the system to handle the
+            // Back button. This calls finish() on this activity and pops the back stack.
+            super.onBackPressed();
+        } else {
+            // Otherwise, select the previous step.
+            //**这里Google自打脸了，我记得AndroidDesign中明确说过
+            //Pager中不要记录page的页面，点击返回不要回到历史page**
+            mPager.setCurrentItem(mPager.getCurrentItem() - 1);
+        }
+    }
+    /**
+     * A simple pager adapter that represents 5 ScreenSlidePageFragment objects, in
+     * sequence.
+     */
+    private class ScreenSlidePagerAdapter extends FragmentStatePagerAdapter {
+        public ScreenSlidePagerAdapter(FragmentManager fm) {
+            super(fm);
+        }
+
+        @Override
+        public Fragment getItem(int position) {
+            return new ScreenSlidePageFragment();
+        }
+
+        @Override
+        public int getCount() {
+            return NUM_PAGES;
+        }
+    }
+}
+```
+
+为了显示自定义的滑动动画，可以实现`ViewPager.PageTransformer`接口并提供(supply)给ViewPager。接口只暴露了一个方法`transformPage()`。屏幕transition的每一点(at each point in...)，方法对于每个可见的(通常只有一个)page和不在屏幕的相邻page调用一次。比如page3可见，然后用户滑动到page4，那么transformPage()被调用给page2、3、4在手势的每个阶段。
+在你对transformPage()的实现中，你搞清楚哪些pages需要基于屏幕上page的position来进行transform变化，然后创建自定义animation。这个参数可以从transformPage方法中的position参数获得。它代表任意page相对于屏幕中间的位置。随着用户在pages之间滚动，这个值也随之动态变化。当一个page填满了屏幕，他的position值就是0，当其从右侧消失，其position就是1。如果用户在1、2页面间滑动到半路(halfway)，page1就有-0.5的position，page2就是0.5。（也就是说往左滑动position就变成负值，往右就是正值。滑动完毕也就是page不再显示就会变成绝对值为1）基于page在屏幕上的position，你可以通过设置page的属性方法比如setAlpha(), setTranslationX(), setScaleY()。来创建自定义animation。
+当你拥有了PageTransformer的实现，调用`setPageTransformer`来应用自定义动画。例如:
+```
+ViewPager mPager = (ViewPager) findViewById(R.id.pager);
+...
+mPager.setPageTransformer(true, new ZoomOutPageTransformer());
+```
+页面放大转换(Zoom-out page transformer)会在滚动的时候缩小并且淡化pages。当page接近中心时，它会变到正常尺寸并淡入。可以直接用：
+```
+public class ZoomOutPageTransformer implements ViewPager.PageTransformer {
+    private static final float MIN_SCALE = 0.85f;
+    private static final float MIN_ALPHA = 0.5f;
+
+    public void transformPage(View view, float position) {
+        int pageWidth = view.getWidth();
+        int pageHeight = view.getHeight();
+
+        if (position < -1) { // [-Infinity,-1)
+            // This page is way off-screen to the left.
+            view.setAlpha(0);
+
+        } else if (position <= 1) { // [-1,1]
+            // Modify the default slide transition to shrink the page as well
+            float scaleFactor = Math.max(MIN_SCALE, 1 - Math.abs(position));
+            float vertMargin = pageHeight * (1 - scaleFactor) / 2;
+            float horzMargin = pageWidth * (1 - scaleFactor) / 2;
+            if (position < 0) {
+                view.setTranslationX(horzMargin - vertMargin / 2);
+            } else {
+                view.setTranslationX(-horzMargin + vertMargin / 2);
+            }
+
+            // Scale the page down (between MIN_SCALE and 1)
+            view.setScaleX(scaleFactor);
+            view.setScaleY(scaleFactor);
+
+            // Fade the page relative to its size.
+            view.setAlpha(MIN_ALPHA +
+                    (scaleFactor - MIN_SCALE) /
+                    (1 - MIN_SCALE) * (1 - MIN_ALPHA));
+
+        } else { // (1,+Infinity]
+            // This page is way off-screen to the right.
+            view.setAlpha(0);
+        }
+    }
+}
+```
+层次页面转换动画(depthPageTransformer)代码，可以直接用：
+```
+public class DepthPageTransformer implements ViewPager.PageTransformer {
+    private static final float MIN_SCALE = 0.75f;
+
+    public void transformPage(View view, float position) {
+        int pageWidth = view.getWidth();
+
+        if (position < -1) { // [-Infinity,-1)
+            // This page is way off-screen to the left.
+            view.setAlpha(0);
+
+        } else if (position <= 0) { // [-1,0]
+            // Use the default slide transition when moving to the left page
+            view.setAlpha(1);
+            view.setTranslationX(0);
+            view.setScaleX(1);
+            view.setScaleY(1);
+
+        } else if (position <= 1) { // (0,1]
+            // Fade the page out.
+            view.setAlpha(1 - position);
+
+            // Counteract the default slide transition
+            view.setTranslationX(pageWidth * -position);
+
+            // Scale the page down (between MIN_SCALE and 1)
+            float scaleFactor = MIN_SCALE
+                    + (1 - MIN_SCALE) * (1 - Math.abs(position));
+            view.setScaleX(scaleFactor);
+            view.setScaleY(scaleFactor);
+
+        } else { // (1,+Infinity]
+            // This page is way off-screen to the right.
+            view.setAlpha(0);
+        }
+    }
+}
+```
+
+卡片翻转动画：
+为卡片翻转创建动画。你需要俩动画，一个用于前面的卡片从左边动画出去，一个是前面的卡片从左边动画进来。同样滴，对于背面的卡片也需要一个从右边进来的动画，一个从右边出去的动画。
+card_flip_left_in.xml
+```
+<set xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Before rotating, immediately set the alpha to 0. -->
+    <objectAnimator
+        android:valueFrom="1.0"
+        android:valueTo="0.0"
+        android:propertyName="alpha"
+        android:duration="0" />
+
+    <!-- Rotate. -->
+    <objectAnimator
+        android:valueFrom="-180"
+        android:valueTo="0"
+        android:propertyName="rotationY"
+        android:interpolator="@android:interpolator/accelerate_decelerate"
+        android:duration="@integer/card_flip_time_full" />
+
+    <!-- Half-way through the rotation (see startOffset), set the alpha to 1. -->
+    <objectAnimator
+        android:valueFrom="0.0"
+        android:valueTo="1.0"
+        android:propertyName="alpha"
+        android:startOffset="@integer/card_flip_time_half"
+        android:duration="1" />
+</set>
+```
+card_flip_left_out.xml
+```
+<set xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Rotate. -->
+    <objectAnimator
+        android:valueFrom="0"
+        android:valueTo="180"
+        android:propertyName="rotationY"
+        android:interpolator="@android:interpolator/accelerate_decelerate"
+        android:duration="@integer/card_flip_time_full" />
+
+    <!-- Half-way through the rotation (see startOffset), set the alpha to 0. -->
+    <objectAnimator
+        android:valueFrom="1.0"
+        android:valueTo="0.0"
+        android:propertyName="alpha"
+        android:startOffset="@integer/card_flip_time_half"
+        android:duration="1" />
+</set>
+```
+card_flip_right_in.xml
+```
+<set xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Before rotating, immediately set the alpha to 0. -->
+    <objectAnimator
+        android:valueFrom="1.0"
+        android:valueTo="0.0"
+        android:propertyName="alpha"
+        android:duration="0" />
+
+    <!-- Rotate. -->
+    <objectAnimator
+        android:valueFrom="180"
+        android:valueTo="0"
+        android:propertyName="rotationY"
+        android:interpolator="@android:interpolator/accelerate_decelerate"
+        android:duration="@integer/card_flip_time_full" />
+
+    <!-- Half-way through the rotation (see startOffset), set the alpha to 1. -->
+    <objectAnimator
+        android:valueFrom="0.0"
+        android:valueTo="1.0"
+        android:propertyName="alpha"
+        android:startOffset="@integer/card_flip_time_half"
+        android:duration="1" />
+</set>
+```
+card_flip_right_out.xml
+```
+<set xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Rotate. -->
+    <objectAnimator
+        android:valueFrom="0"
+        android:valueTo="-180"
+        android:propertyName="rotationY"
+        android:interpolator="@android:interpolator/accelerate_decelerate"
+        android:duration="@integer/card_flip_time_full" />
+
+    <!-- Half-way through the rotation (see startOffset), set the alpha to 0. -->
+    <objectAnimator
+        android:valueFrom="1.0"
+        android:valueTo="0.0"
+        android:propertyName="alpha"
+        android:startOffset="@integer/card_flip_time_half"
+        android:duration="1" />
+</set>
+```
+卡片的每面都是可以包含任何内容的layout，比如俩屏幕的文本，图片，或者任何组合的views。你会在你想动画的fragments中用到这俩布局。
+对于卡片的两面，创建俩fragment，其中返回了你之前定义的layouts。你可以在父activity中你想展示卡片的时候创建fragment的实例，代码展示了父activity内的嵌套fragment(nested fragment classes)：
+```
+public class CardFlipActivity extends Activity {
+    ...
+    /**
+     * A fragment representing the front of the card.
+     */
+    public class CardFrontFragment extends Fragment {
+        @Override
+        public View onCreateView(LayoutInflater inflater, ViewGroup container,
+                Bundle savedInstanceState) {
+            return inflater.inflate(R.layout.fragment_card_front, container, false);
+        }
+    }
+
+    /**
+     * A fragment representing the back of the card.
+     */
+    public class CardBackFragment extends Fragment {
+        @Override
+        public View onCreateView(LayoutInflater inflater, ViewGroup container,
+                Bundle savedInstanceState) {
+            return inflater.inflate(R.layout.fragment_card_back, container, false);
+        }
+    }
+}
+```
+现在你需要在父activity中显示fragments。在其布局文件中你可以创建Framelayout作为容器，这样你可以实时添加fragments。然后在activity设置好content view。在activity创建的时候就显示默认的fragment通常是个好主意：
+```
+public class CardFlipActivity extends Activity {
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_activity_card_flip);
+
+        if (savedInstanceState == null) {
+            getFragmentManager()
+                    .beginTransaction()
+                    .add(R.id.container, new CardFrontFragment())
+                    .commit();
+        }
+    }
+    ...
+}
+```
+现在你有了卡片前面，你可以在合适的时候用翻转动画来展示背面。创建展示卡片另一面的动画需要做这些事：
+- 为fragment转换设置你之前创建好的自定义动画
+- 用新的fragment替换现在显示的fragment，并应用自定义动画
+- 把之前显示的fragment加入回退栈(back stack)这样用户点击返回卡片就可以翻转回去。
+```
+private void flipCard() {
+    if (mShowingBack) {
+        getFragmentManager().popBackStack();
+        return;
+    }
+    // Flip to the back.
+    mShowingBack = true;
+
+    // Create and commit a new fragment transaction that adds the fragment for
+    // the back of the card, uses custom animations, and is part of the fragment
+    // manager's back stack.
+
+    getFragmentManager()
+            .beginTransaction()
+
+            // Replace the default fragment animations with animator resources
+            // representing rotations when switching to the back of the card, as
+            // well as animator resources representing rotations when flipping
+            // back to the front (e.g. when the system Back button is pressed).
+            .setCustomAnimations(
+                    R.animator.card_flip_right_in,
+                    R.animator.card_flip_right_out,
+                    R.animator.card_flip_left_in,
+                    R.animator.card_flip_left_out)
+
+            // Replace any fragments currently in the container view with a
+            // fragment representing the next page (indicated by the
+            // just-incremented currentPage variable).
+            .replace(R.id.container, new CardBackFragment())
+
+            // Add this transaction to the back stack, allowing users to press
+            // Back to get to the front of the card.
+            .addToBackStack(null)
+            // Commit the transaction.
+            .commit();
+}
+```
+
+点击放大view的效果：
+
+创建一个包含小的和你想放大的内容的大的版本的layout（好拗口）。下面的代码用ImageButton作为图片的索缩略图和一个显示放大版的Imageview：
+```
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <ImageButton
+            android:id="@+id/thumb_button_1"
+            android:layout_width="100dp"
+            android:layout_height="75dp"
+            android:layout_marginRight="1dp"
+            android:src="@drawable/thumb1"
+            android:scaleType="centerCrop"
+            android:contentDescription="@string/description_image_1" />
+
+    </LinearLayout>
+
+    <!-- This initially-hidden ImageView will hold the expanded/zoomed version of
+         the images above. Without transformations applied, it takes up the entire
+         screen. To achieve the "zoom" animation, this view's bounds are animated
+         from the bounds of the thumbnail button above, to its final laid-out
+         bounds.
+         -->
+
+    <ImageView
+        android:id="@+id/expanded_image"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="invisible"
+        android:contentDescription="@string/description_zoom_touch_close" />
+
+</FrameLayout>
+```
+应用了layout后，设置一下触发放大动画的事件处理器(event handlers)：
+```
+public class ZoomActivity extends FragmentActivity {
+    // Hold a reference to the current animator,
+    // so that it can be canceled mid-way.
+    private Animator mCurrentAnimator;
+
+    // The system "short" animation time duration, in milliseconds. This
+    // duration is ideal for subtle animations or animations that occur
+    // very frequently.
+    private int mShortAnimationDuration;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_zoom);
+
+        // Hook up clicks on the thumbnail views.
+
+        final View thumb1View = findViewById(R.id.thumb_button_1);
+        thumb1View.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                zoomImageFromThumb(thumb1View, R.drawable.image1);
+            }
+        });
+
+        // Retrieve and cache the system's default "short" animation time.
+        mShortAnimationDuration = getResources().getInteger(
+                android.R.integer.config_shortAnimTime);
+    }
+    ...
+}
+```
+
+一般来说你得从正常尺寸的view的边界动画到大版本view的边界。你得做这些事：
+1. 分配高分辨率的图片到隐藏的"zoomed-in"(放大的)ImageView中。你需要在分支线程加载图像以防阻塞UI线程，并且在UI线程设置bitmap。理想情况下，bitmap不该比屏幕尺寸大。
+2. 计算开始和结束时ImageView的边界。
+3. 分别同步地动画4个位置和尺寸属性X, Y, SCALE_X, SCALE_Y，从开始到结束边界。这4个动画加到一个`AnimatorSet`中这样可以同时启动。
+4. 当用户放大图片后，点击屏幕时需要运行一个类似的动画以退出放大(zoom back out)。
+(译者注：下面代码仅供学习，因为android L后有了自带的transition效果: ActivityOptionsCompat.makeSceneTransitionAnimation)
+```
+private void zoomImageFromThumb(final View thumbView, int imageResId) {
+    // If there's an animation in progress, cancel it
+    // immediately and proceed with this one.
+    if (mCurrentAnimator != null) {
+        mCurrentAnimator.cancel();
+    }
+
+    // Load the high-resolution "zoomed-in" image.
+    final ImageView expandedImageView = (ImageView) findViewById(
+            R.id.expanded_image);
+    expandedImageView.setImageResource(imageResId);
+
+    // Calculate the starting and ending bounds for the zoomed-in image.
+    // This step involves lots of math. Yay, math.
+    final Rect startBounds = new Rect();
+    final Rect finalBounds = new Rect();
+    final Point globalOffset = new Point();
+
+    // The start bounds are the global visible rectangle of the thumbnail,
+    // and the final bounds are the global visible rectangle of the container
+    // view. Also set the container view's offset as the origin for the
+    // bounds, since that's the origin for the positioning animation
+    // properties (X, Y).
+    thumbView.getGlobalVisibleRect(startBounds);
+    findViewById(R.id.container)
+            .getGlobalVisibleRect(finalBounds, globalOffset);
+    startBounds.offset(-globalOffset.x, -globalOffset.y);
+    finalBounds.offset(-globalOffset.x, -globalOffset.y);
+
+    // Adjust the start bounds to be the same aspect ratio as the final
+    // bounds using the "center crop" technique. This prevents undesirable
+    // stretching during the animation. Also calculate the start scaling
+    // factor (the end scaling factor is always 1.0).
+    float startScale;
+    if ((float) finalBounds.width() / finalBounds.height()
+            > (float) startBounds.width() / startBounds.height()) {
+        // Extend start bounds horizontally
+        startScale = (float) startBounds.height() / finalBounds.height();
+        float startWidth = startScale * finalBounds.width();
+        float deltaWidth = (startWidth - startBounds.width()) / 2;
+        startBounds.left -= deltaWidth;
+        startBounds.right += deltaWidth;
+    } else {
+        // Extend start bounds vertically
+        startScale = (float) startBounds.width() / finalBounds.width();
+        float startHeight = startScale * finalBounds.height();
+        float deltaHeight = (startHeight - startBounds.height()) / 2;
+        startBounds.top -= deltaHeight;
+        startBounds.bottom += deltaHeight;
+    }
+
+    // Hide the thumbnail and show the zoomed-in view. When the animation
+    // begins, it will position the zoomed-in view in the place of the
+    // thumbnail.
+    thumbView.setAlpha(0f);
+    expandedImageView.setVisibility(View.VISIBLE);
+
+    // Set the pivot point for SCALE_X and SCALE_Y transformations
+    // to the top-left corner of the zoomed-in view (the default
+    // is the center of the view).
+    expandedImageView.setPivotX(0f);
+    expandedImageView.setPivotY(0f);
+
+    // Construct and run the parallel animation of the four translation and
+    // scale properties (X, Y, SCALE_X, and SCALE_Y).
+    AnimatorSet set = new AnimatorSet();
+    set
+            .play(ObjectAnimator.ofFloat(expandedImageView, View.X,
+                    startBounds.left, finalBounds.left))
+            .with(ObjectAnimator.ofFloat(expandedImageView, View.Y,
+                    startBounds.top, finalBounds.top))
+            .with(ObjectAnimator.ofFloat(expandedImageView, View.SCALE_X,
+            startScale, 1f)).with(ObjectAnimator.ofFloat(expandedImageView,
+                    View.SCALE_Y, startScale, 1f));
+    set.setDuration(mShortAnimationDuration);
+    set.setInterpolator(new DecelerateInterpolator());
+    set.addListener(new AnimatorListenerAdapter() {
+        @Override
+        public void onAnimationEnd(Animator animation) {
+            mCurrentAnimator = null;
+        }
+
+        @Override
+        public void onAnimationCancel(Animator animation) {
+            mCurrentAnimator = null;
+        }
+    });
+    set.start();
+    mCurrentAnimator = set;
+
+    // Upon clicking the zoomed-in image, it should zoom back down
+    // to the original bounds and show the thumbnail instead of
+    // the expanded image.
+    final float startScaleFinal = startScale;
+    expandedImageView.setOnClickListener(new View.OnClickListener() {
+        @Override
+        public void onClick(View view) {
+            if (mCurrentAnimator != null) {
+                mCurrentAnimator.cancel();
+            }
+
+            // Animate the four positioning/sizing properties in parallel,
+            // back to their original values.
+            AnimatorSet set = new AnimatorSet();
+            set.play(ObjectAnimator
+                        .ofFloat(expandedImageView, View.X, startBounds.left))
+                        .with(ObjectAnimator
+                                .ofFloat(expandedImageView, 
+                                        View.Y,startBounds.top))
+                        .with(ObjectAnimator
+                                .ofFloat(expandedImageView, 
+                                        View.SCALE_X, startScaleFinal))
+                        .with(ObjectAnimator
+                                .ofFloat(expandedImageView, 
+                                        View.SCALE_Y, startScaleFinal));
+            set.setDuration(mShortAnimationDuration);
+            set.setInterpolator(new DecelerateInterpolator());
+            set.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    thumbView.setAlpha(1f);
+                    expandedImageView.setVisibility(View.GONE);
+                    mCurrentAnimator = null;
+                }
+
+                @Override
+                public void onAnimationCancel(Animator animation) {
+                    thumbView.setAlpha(1f);
+                    expandedImageView.setVisibility(View.GONE);
+                    mCurrentAnimator = null;
+                }
+            });
+            set.start();
+            mCurrentAnimator = set;
+        }
+    });
+}
+```
+ 
+动画布局的变化：
+布局动画是一种每次你对布局配置改变时系统运行的预加载动画。你需要做的就是在layout中设置一个属性，以告诉系统来动画这些布局改变，然后系统默认的动画就会自动为你执行(carry out)。如果你需要提供自定义布局动画，创建`LayoutTransition`对象然后提供它一个带有setLayoutTransition方法的布局。
+
+在布局文件中，加入`android:animateLayoutChanges`属性为true即可。现在，你所需要做的就是添加、移除，或者更新布局的item然后item就会自动动画了：
+```
+private ViewGroup mContainerView;
+...
+private void addItem() {
+    View newView;
+    ...
+    mContainerView.addView(newView, 0);
+}
+```
+
+## Connectivity & the Cloud
+
+### Transferring Data Without Draining the Battery
+这节课演示了计划和执行下载的最佳实践，比如缓存，polling，和预加载(prefetch)。你可以学到(You'll learn how the power-use profile of the wireless radio can affect your choices on when, what, and how to transfer data in order to minimize impact on battery life)巴拉巴拉。
+
+一个完全活跃的无线电([Wireless radio](http://baike.baidu.com/link?url=e2IzUhL5A4UKxeZGCT_YZBx2t5BsKFuGJk7PmG22nG6sOjjn2T61ogUIzClwCvr4fRcCHHt8URr7ULy32nehrK-tolk3AFj7AUzFczz_wsW))非常消耗电量(consumes significant power)，所以为了省电不用的时候它会在不同的能量状态之间切换，同时在需要的时候为了减少等待时间，与为无线电加电所关联(while attempting to minimize latency associated with "powering up" the radio when it's required)。
+这种对于典型的3G网络无线电的状态机器由3种能量状态构成(The state machine for a typical 3G network radio consists of three energy states)：
+1. 满电力：连接活跃时使用，允许设备以最高速率传输数据。
+2. 低电力：大约消耗满电力一半的电量的中间(intermediate)状态。
+3. 待机(standby)：在没有活跃的或者必须的网络连接期间。消耗最小电量。
+尽管后俩状态消耗更少的电量，他们也带来了网络请求的明显延迟。从low状态到full电力状态大概要花1.5s，而从待机到full要花费2s以上。为了最小化等待时间，状态机器(state machine)使用延迟来推迟到更低级别的能量状态的转换。下图是AT&T(美国第二大移动运营商)对于典型3G无线电的时间：
+![](http://developer.android.com/images/efficient-downloads/mobile_radio_state_machine.png)
+Figure 1. Typical 3G wireless radio state machine.
+
+在每个设备上，radio state machine，尤其是关联转换的延迟(尾巴时间)和开启等待时间(sartup latency)，根据其使用的无线电技术（2G, 3G, LTE，etc）而不同，并与运营商和设备的配置有关。
+这节课根据AT&T提供的数据，描述了典型3G无线电的state machine。但是，一般的原则和最佳事件的结论适用于所有无线电的实现。这招对于典型的web浏览尤其有效，因为他避免了用户浏览网页时的不爽的延迟。相对低的tail-time保证了一旦浏览结束，无线电就可以移动到较低的能量状态。
+不幸的是，这招在现代的智能手机系统会导致app的低效率。因为app既运行在前台（延迟很要命）又运行在后台（电池寿命需要优先考虑）。*怎么解决呢？那就是我们今天的产品，新一代锂电池，小体积，高容量！仅售998！*咳咳，开个玩笑。
+
+每次你创建新的网络连接，无线电都会切换到full power状态。对于之前说的典型3G无线电状态机器，它在你传送数据的持续时间内都保持full power——外加5s的尾巴时间——接下来就是12s的低能量状态。也就是说，每次数据传送都会引起无线电消耗20s的能量。
+在实际应用中，这意味着传送未捆绑数据(unbundled)1s，就会保持无限电激活18s。回到Full power状态跟变成闲置(idle)状态差不多。
+结果就是，每分钟都会消耗高电量状态18s，剩下42s消耗低电量状态。
+相比之下，同样的app，每分钟传送3s数据会让无线电保持高电量状态仅仅8s，并让他保持在低电量状态仅仅是额外的12s。
+第二个例子允许无线电每分钟闲置额外的40s，这可以大幅度减少电量消耗。
+![](http://developer.android.com/images/efficient-downloads/graphs.png)
+Figure 2. Relative wireless radio power use for bundled versus unbundled transfers.
+
+预加载数据是有效减少数据传送任务次数的方法。Prefetching让你在一次连接中全速下载所有你可能在特定的时间段需要的数据，
