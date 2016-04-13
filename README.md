@@ -2640,4 +2640,27 @@ Figure 1. Typical 3G wireless radio state machine.
 ![](http://developer.android.com/images/efficient-downloads/graphs.png)
 Figure 2. Relative wireless radio power use for bundled versus unbundled transfers.
 
-预加载数据是有效减少数据传送任务次数的方法。Prefetching让你在一次连接中全速下载所有你可能在特定的时间段需要的数据，
+预加载数据是有效减少数据传送任务次数的方法。Prefetching让你在一次连接中全速下载所有你可能在特定的时间段需要的数据.
+通过预加载你要交换的数据，你减少了无线电为了下载数据而激活的次数。作为结果，你不仅仅节省了电池电量，还优化了等待时间，降低了需求的带宽。
+但是捏，用的过于频繁，预加载也带来了增加消耗电量和带宽使用的风险(下载了不需要的数据)。确保预加载没有造成app启动延迟也很重要。(In practical terms that might mean processing data progressively, or initiating consecutive transfers prioritized such that the data required for application startup is downloaded and processed first.)
+你预加载多频繁取决于要下的数据的大小和它被用到的可能性。作为一个粗略的指导，基于上述的state machine，对于有50%可能性使用概率的数据，一般你可以下载大概6s(大概1-2Mb)（you can typically prefetch for around 6 seconds (approximately 1-2 Mb) before the potential cost of downloading unused data matches the potential savings of not downloading that data to begin with.）
+通常来说，预加载是个好习惯，这样你只需要初始化另一个下载每2-5分钟，以1-5mb的顺序。（you will only need to initiate another download every 2 to 5 minutes, and in the order of 1 to 5 megabytes.）遵循这个规则，大量下载——比如视频——应该以规律的间隔（每2-5分钟）来大块大块的吃肉哦不，下载。高效地预加载只有可能在接下来几分钟会被播放的视频。注意，进一步的下载应该打包，下个部分会谈到。而且这些近似值会基于连接类型和速度而不同。
+来看几个实例：
+**音乐播放器：**
+你应该选择预加载整个相册，但是可能用户在第一首歌听完就停止了，所那样你就浪费了一大堆带宽和电量。
+更好的方案是，维持一首歌的缓存(buffer)和这首正在播放的歌。对于流音乐，比如维持会保持无线电一直活跃的连续的流，不如考虑用HTTP live streaming来传送突然的音频流，模拟上述的预加载方法。
+**新闻阅读器**：
+许多资讯类app试图在一个栏目被选中后就下载头条数据来减少带宽，完整的文章只当用户想读的时候才加载。这个方法，当用户滚动头条（标题）的时候无线电会为了用户的阅读任务而强制保持活跃。不仅如此，在能量状态间的持续切换回导致切换栏目或者读文章时造成明显延迟。
+更好的方案是在启动时就预加载合理数量的数据，从第一组新闻头条（标题）和缩略图开始——确保开始时一个较低的等待时间——然后接着加载剩余的头条和缩略图，以及至少第一批标题列表中每个文章的内容。
+另一个选择是预加载每个文章头条、缩略图、文本，可能的话甚至全部的文章图片——一般在后台设定好计划来加载。这个方法冒着消耗大量宽带的电池电量的风险下载了可能用不到的数据，所以要小心使用。还有一个解决方法是仅当wifi下才下载全部内容，可能的话仅当充电时才下载。
+
+批量传送和连接
+
+一个每20s ping一次服务器的app，只要确认app在运行并且对用户可见，就会无限地保持无线电开启状态，导致几乎没有数据传输却消耗大量电量的后果。
+要记住，打包你的数据传送和创建待处理的传送队列很重要。其核心理念是在每次传送任务期间传送尽可能多的数据。为了限制你需求的任务数量。
+任何时间敏感的数据传送或者按需加载——比如下载全尺寸图片——都应该事先有规律地更新。计划好的更新应该在按需加载的同时来执行，在一定间隔后下一波计划好的更新会被执行。这个方法通过在必须的时间敏感的图片下载时的piggy-backing减轻了执行常规更新的代价。
+
+一般来说，复用已有的网络连接比初始化新的要更有效率。复用使得网络更智能地对拥堵和数据问题作出反应。比起创建多个同步的连接来下载数据，或者连接(chaining)多个连续的(consecutive)GET请求，你应该尽可能打包(bundle)这些请求成单独的一个GET请求。
+比如，为每个新闻文章做一个单一的请求比为几个新闻目录做多个请求要高效。无线电为了传送终端给带有客户端服务端超时的确认包(acknowledgement packets)，需要保持活跃。所以不用的时候要关闭连接是个好习惯，而不是等待超时。
+话虽如此(That said)，过早关闭连接会让他没法复用，然后为了建立新连接就会导致额外的开支(overhead)。有用的妥协办法是立刻关闭连接，但是但是仍然要在固有的timeout过期之前关闭。
+
