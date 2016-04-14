@@ -2664,3 +2664,70 @@ Figure 2. Relative wireless radio power use for bundled versus unbundled transfe
 比如，为每个新闻文章做一个单一的请求比为几个新闻目录做多个请求要高效。无线电为了传送终端给带有客户端服务端超时的确认包(acknowledgement packets)，需要保持活跃。所以不用的时候要关闭连接是个好习惯，而不是等待超时。
 话虽如此(That said)，过早关闭连接会让他没法复用，然后为了建立新连接就会导致额外的开支(overhead)。有用的妥协办法是立刻关闭连接，但是但是仍然要在固有的timeout过期之前关闭。
 
+定期更新的最佳频率会基于不同设备状态、网络连接、用户行为和明确的用户偏好而不同。
+这节课会审查(examine)你的刷新频率如何能最好地减轻基于无线电状态机器的后台更新的效果。
+接下来讲的是[用GCM来轮询](http://developer.android.com/intl/zh-cn/training/efficient-downloads/regular_updates.html#GCM)(polling)，这里不翻了。
+
+多余的下载是多余的：
+最基本的减少下载的方法是只下载你需要的东西。就数据而言(In terms of data)，这意味着实现REST APIS允许你指定具体查询条件比如上次你更新的时间，来限制返回的数据。同样地，下载图片的时候，服务端减少图片尺寸也是个好习惯，而不是下载全尺寸的然后在客户端裁剪。
+另外一个重要技巧是避免下载重复数据。你可以通过频繁的缓存来实现。永远缓存固定的资源，包括按需下载的比如全尺寸的图片，只要合理的可能性(for as long as reasonably possible)。按需的资源应该单独存储，这样可以让你定期地刷新你按需缓存来管理其尺寸。
+为了确保你的缓存不会导致app显示旧的(stale)数据，在请求内容最新更新和过期的时候记得从HTTP响应头(HTTP response headers)提取时间。这可以让你决定相关内容应不应该被刷新。
+```
+long currentTime = System.currentTimeMillis();
+
+HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+
+long expires = conn.getHeaderFieldDate("Expires", currentTime);
+long lastModified = conn.getHeaderFieldDate("Last-Modified", currentTime);
+
+setDataExpirationDate(expires);
+
+if (lastModified < lastUpdateTime) {
+  // Skip update
+} else {
+  // Parse update
+}
+```
+这个方法，你可以高效地缓存动态内容，同时确保不会导致你app显示旧数据。你可以在不受管理的外部缓存文件夹缓存不敏感的数据：`Context.getExternalCacheDir();`或者，你可以用受到管理/安全的应用缓存。这一这个缓存在系统存储空间不足时可能会被清理掉。`Context.getCacheDir()`
+
+用HttpURLConnection缓存（因为不用这玩意了，所以显然，不翻）
+
+基于连接类型来修改下载模式：
+当谈到对电量的影响，不是所有连接类型都相等的。不止是WiFi比无线电（译者注：可以认为是流量）耗电更少这么简单，而且无线电的不同技术对于电量也有不同影响(implications)。
+大多数情况下，WiFi无线电可以提供更高带宽并消耗更少电量。结论就是，你应该在任何连接到WiFi的时候去努力下载数据。你可以用broadcast receiver来监听WiFi的连接，来执行重要的下载，计划好的更新，甚至临时增加更新频率。
+用更高的带宽来以更少的频率下载更多的数据（好拗口）
+连接到流量时，更高的带宽通常带来的是更高电量消耗。这意味着LTE一般比3G消耗更多能量（LTE>3G>2G）
+与此同时，高带宽以为你可以更频繁加载数据，同样的时间能下载更多数据。可能有点反直觉(Perhaps less intuitively)，因为电池消耗的尾巴时间相对更高，在每次数据传输任务中，保持无线电活跃更长时间会更高效。
+比如，一个LTE电磁波是3G的带宽和能量消耗的2倍，你应该在每次任务中下载4倍的数据——或者大约10mb。当下载这么多数据时，考虑到你预加载在可用的本地内存和周期性地flush你的预加载缓存很重要。
+你可以用ConnectivityManager来决定激活的无线电，并修改你预加载的流程。
+```
+ConnectivityManager cm =
+ (ConnectivityManager)getSystemService(Context.CONNECTIVITY_SERVICE);
+
+TelephonyManager tm =
+  (TelephonyManager)getSystemService(Context.TELEPHONY_SERVICE);
+  
+NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+ 
+int PrefetchCacheSize = DEFAULT_PREFETCH_CACHE;
+ 
+switch (activeNetwork.getType()) {
+  case (ConnectivityManager.TYPE_WIFI): 
+    PrefetchCacheSize = MAX_PREFETCH_CACHE; break;
+  case (ConnectivityManager.TYPE_MOBILE): {
+    switch (tm.getNetworkType()) {
+      case (TelephonyManager.NETWORK_TYPE_LTE | 
+            TelephonyManager.NETWORK_TYPE_HSPAP): 
+        PrefetchCacheSize *= 4;
+        break;
+      case (TelephonyManager.NETWORK_TYPE_EDGE | 
+            TelephonyManager.NETWORK_TYPE_GPRS): 
+        PrefetchCacheSize /= 2;
+        break;
+      default: break;
+    }
+    break;
+  }
+  default: break;
+}
+```
