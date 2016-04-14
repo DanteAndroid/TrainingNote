@@ -1,20 +1,22 @@
+本文用尽可能通俗且准确的语言翻译了我认为Training文档中较重要的部分。其他不常用或者依据业务需求而不同的部分（如蓝牙，高级动画）暂不做翻译。注意，本人无论是英语和技术水平都很有限，如有瑕疵请不要犹豫，告诉我你的想法。
+
 # Menu
-1. [Getting started](#getting-started)
-    1. [Supporting Different Screens](#supporting-different-screens)
-    2. [Managing the Activity Lifecycle](#managing-the-activity-lifecycle)
-    3. [Building a Dynamic UI with Fragments](#building-a-dynamic-ui-with-fragments)
-    4. [Interacting with Other Apps](interacting-with-other-apps)
-    5. [Working with System Permissions](working-with-system-permissions)
-2. [Content Sharing](#content-sharing)
-2. [Multimedia](#multimedia)
-    1. [Manage Audio Playback](#manage-audio-playback)
-    2. [Capturing Photos](#capturing-photos)
-3. [Graphics & Animation](#graphics-&-animation)
-    1. [Display Bitmaps Efficiently](#display-bitmaps-efficiently)
-    2. [Animating Views Using Scenes and Transitions](#animating-views–using–scenes–and-transitions)
-    3. [Adding Animations](#adding-animations)
-4. [Connectivity & the Cloud](connectivity-&-the-cloud)
-    1. [Transferring Data Without Draining the Battery](transferring–data–without–draining-the-battery)
+1. [开始吧](#getting-started)
+    1. [屏幕适配](#supporting-different-screens)
+    2. [管理Activity生命周期](#managing-the-activity-lifecycle)
+    3. [用Fragments构建动态UI](#building-a-dynamic-ui-with-fragments)
+    4. [与其他app交♂互](interacting-with-other-apps)
+    5. [搞好系统权限](working-with-system-permissions)
+2. [分享内容](#content-sharing)
+2. [多媒体](#multimedia)
+    1. [管理音频播放](#manage-audio-playback)
+    2. [拍照](#capturing-photos)
+3. [图像 & 动画](#graphics-&-animation)
+    1. [高效显示bitmap](#display-bitmaps-efficiently)
+    2. [用Scenes和Transitions来使view动起来](#animating-views–using–scenes–and-transitions)
+    3. [添加动画](#adding-animations)
+4. [网络连接](connectivity-&-the-cloud)
+<!--1. [Transferring Data Without Draining the Battery](transferring–data–without–draining-the-battery)-->
 
     
 ---
@@ -2731,3 +2733,7 @@ switch (activeNetwork.getType()) {
   default: break;
 }
 ```
+
+---
+
+以上是training部分，还有重要的Best practice部分我会在另一篇文章中写完。
