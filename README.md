@@ -1,5 +1,8 @@
 本文用尽可能通俗且准确的语言翻译了我认为Training文档中较重要的部分。其他不常用或者依据业务需求而不同的部分（如蓝牙，高级动画）暂不做翻译。注意，本人无论是英语和技术水平都很有限，如有瑕疵请不要犹豫，告诉我你的想法。
 
+>---update 4.14---
+Building apps部分翻译完成，下一步：润色
+
 # Menu
 1. [开始吧](#getting-started)
     1. [屏幕适配](#supporting-different-screens)
@@ -16,8 +19,8 @@
     2. [用Scenes和Transitions来使view动起来](#animating-views–using–scenes–and-transitions)
     3. [添加动画](#adding-animations)
 4. [网络连接](connectivity-&-the-cloud)
-<!--1. [Transferring Data Without Draining the Battery](transferring–data–without–draining-the-battery)-->
 
+<!--1. [Transferring Data Without Draining the Battery](transferring–data–without–draining-the-battery)-->
     
 ---
 ##Getting started
@@ -2736,4 +2739,4 @@ switch (activeNetwork.getType()) {
 
 ---
 
-以上是training部分，还有重要的Best practice部分我会在另一篇文章中写完。
+以上是Building apps部分，还有重要的Best practice部分我会在另一篇文章中写完。
