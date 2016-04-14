@@ -10,8 +10,8 @@ Building apps部分翻译完成，下一步：润色
     1. [屏幕适配](#supporting-different-screens)
     2. [管理Activity生命周期](#managing-the-activity-lifecycle)
     3. [用Fragments构建动态UI](#building-a-dynamic-ui-with-fragments)
-    4. [与其他app交♂互](interacting-with-other-apps)
-    5. [搞好系统权限](working-with-system-permissions)
+    4. [与其他app交♂互](#interacting-with-other-apps)
+    5. [搞好系统权限](#working-with-system-permissions)
 2. [分享内容](#content-sharing)
 2. [多媒体](#multimedia)
     1. [管理音频播放](#manage-audio-playback)
@@ -20,7 +20,7 @@ Building apps部分翻译完成，下一步：润色
     1. [高效显示bitmap](#display-bitmaps-efficiently)
     2. [用Scenes和Transitions来使view动起来](#animating-views–using–scenes–and-transitions)
     3. [添加动画](#adding-animations)
-4. [网络连接](connectivity-&-the-cloud)
+4. [网络连接](#connectivity-&-the-cloud)
 
 <!--1. [Transferring Data Without Draining the Battery](transferring–data–without–draining-the-battery)-->
     
