@@ -697,11 +697,11 @@ startActivity(Intent.createChooser(shareIntent, getResources().getText(R.string.
 接受分享的app需要对Uri指向的数据的访问权限。推荐做法：
 > Store the data in your own ContentProvider, making sure that other apps have the correct permission to access your provider. The preferred mechanism for providing access is to use per-URI permissions which are temporary and only grant access to the receiving application. An easy way to create a ContentProvider like this is to use the FileProvider helper class.
 
-- 把数据存储到你自己的ContentProvider，确保其他app有正确权限能访问你的Provider。提供权限的一个极好的技巧是用per-URI permissions，它是临时性的权限，而且只授予给接受的app。一个简单的方法是创造一个像这样的ContentProvider来用FileProvider帮助类（这里翻译不太清楚，因为没用过）。
+- 把数据存储到你自己的ContentProvider，确保其他app有正确权限能访问你的Provider。提供权限的一个极好的技巧是用pre-URI permissions，它是临时性的权限，而且只授予给接受的app。一个简单的方法是创造一个像这样的ContentProvider来用FileProvider帮助类（这里翻译不太清楚，因为没用过）。
 
 >Use the system MediaStore. The MediaStore is primarily aimed at video, audio and image MIME types, however beginning with Android 3.0 (API level 11) it can also store non-media types (see MediaStore.Files for more info). Files can be inserted into the MediaStore using scanFile() after which a content:// style Uri suitable for sharing is passed to the provided onScanCompleted() callback. Note that once added to the system MediaStore the content is accessible to any app on the device.
 
-- 用系统的MediaStore（媒体库）。媒体库主要用于视频、音频和图片的MIME类型，但是从3.0开始，就可以存储非媒体类型了。文件可以用`scanFile()`来插入媒体库，可以把符合`content://`格式的Uri传入提供的`onScanComplted()`回调方法。注意，只要加到MediaStore，就能被其他app访问了。
+- 用系统的MediaStore（媒体库）。媒体库主要用于视频、音频和图片的MIME类型，但是从3.0开始，就可以存储非媒体类型了。文件可以用`scanFile()`来插入媒体库，可以把符合`content://`格式的Uri传入提供的`onScanComplted()`回调方法。注意，只要加到MediaStore，就能被设备上其他任何app访问。
 
 分享多条内容：
 ```
@@ -783,9 +783,9 @@ void handleSendMultipleImages(Intent intent) {
     }
 }
 ```
-检查进来的数据时，一定要额外小心，你永远不知道其他app会发送**什♂么♀数据**给你。比如可能会有错的MIME type被设置，或者发送的图片超级超级大，另外，记得在子线程不要在主线程处理二进制数据。
+检查进来的数据时，一定要额外小心，你永远不知道其他app会发送什♂么♀数据给你。比如可能会有错的MIME type被设置，或者发送的图片超级超级大，另外，记得不要在主线程处理二进制数据。
 
-从4.0开始，实现一个高效的、用户友好的分享操作变得更加简单。使用ActionProvider，只要依附到actionBar的一个菜单项，就可以处理外观和点击的行为。至于ShareActionProvider，你只要提供一个分享的intent它就会帮你处理好。要用SAP的话，只要在菜单项里面加一个`actionProviderClass`属性就行了：
+从4.0开始，实现一个高效的、用户友好的分享操作变得更加简单，那就是用ActionProvider。只要依附到actionBar的一个菜单项，就可以处理外观和点击事件。至于ShareActionProvider，你只要提供一个分享的intent它就会帮你处理好。要用ShareActionProvider的话，只要在菜单项里面加一个`actionProviderClass`属性就行了：
 
 > //注意，这段是官方提供的代码，但是亲测不能正常显示
     <menu xmlns:android="http://schemas.android.com/apk/res/android">
@@ -885,8 +885,8 @@ void handleSendMultipleImages(Intent intent) {
 > A good user experience is a predictable one
 
 好的用户体验是可控的（可预测的）。如果你的app播放音视频，那么能让用户通过软件或者硬件的方式来调节设备、蓝牙、耳机的音量就很重要。（同样地，播放、暂停、停止、跳过、前一首如果需要的话，也应该执行各自的行为）。创造一个可控的音频体验的第一步，是搞清楚你app用的是哪个音频流。
-系统为播放音乐，闹铃，电话铃，系统提示音，电话音量，和DTMF tones（什么鬼）都维持了一个独立的音频流。这样主要为了让用户能独立控制每个流的音量。大部分流都受限于系统事件，所以除非你app是第三方闹钟，播放音频基本上一定用的是`STREAM_MUSIC`流。大部分情况，按下音量键都会改变正在活跃的音频流，如果你app啥都没放，就只会改变手机铃声音量。如果你搞的是音乐或者游戏app，那么很可能当用户按下音量键的时候，他们想控制游戏或音乐的音量，即便可能歌曲正在切换，或者当前游戏场景没音乐。这种情况下，可能想监听音量键并修改你音频流的音量。请你忍住这个欲♂望♀。android提供了现成的`setVolumeControlStream()`方法来联系(direct)音量键和你指定的stream。 
-确认了你app会用的音频流后，你应该把他设为目标声音流。你应该在app生命周期中尽早调用（onCreate），因为只需要调用一次。这方法确保无论你app是否可见，音量键总是能像用户预期的一样工作。`setVolumeControlStream(AudioManager.STREAM_MUSIC);`从这时开始，按下音量键就会影响到你指定的audio stream，无论目标activity或fragment是不是可见的。
+系统为播放音乐，闹铃，电话铃，系统提示音，电话音量，和DTMF tones（什么鬼）都维持了一个独立的音频流。这样主要为了让用户能独立控制每个流的音量。大部分流都受限于系统事件，所以除非你app是第三方闹钟，播放音频基本上一定用的是`STREAM_MUSIC`流。大部分情况，按下音量键都会改变正在活跃的音频流，如果你app啥都没放，就只会改变手机铃声音量。如果你搞的是音乐或者游戏app，那么很可能当用户按下音量键的时候，他们想控制游戏或音乐的音量(即便可能歌曲正在切换，或者当前游戏场景没音乐)。这种情况下，可能想监听音量键并修改你音频流的音量。请你忍住这个欲♂望♀。android提供了现成的`setVolumeControlStream()`方法来联系(direct)音量键和你指定的stream。 
+确认了你app会用的音频流后，你应该把他设为目标声音流。你应该在app生命周期中尽早调用（onCreate），因为只需要调用一次。这方法确保无论你app是否可见，音量键总是能像用户预期的一样工作。`setVolumeControlStream(AudioManager.STREAM_MUSIC);`从这时开始，按下音量键就会影响到你指定的audio stream，无论目标activity或fragment是否可见。
 
 播放、暂停、前一首等等媒体播放键在一些耳机和许多手机上都有。当用户按下这些实体键时，系统会发一个带`AXCCTION_MEDIA_BUTTON`的action的Intent的广播。为了响应它，你得注册一个BroadcastReceiver：
 ```
@@ -921,7 +921,7 @@ am.registerMediaButtonEventReceiver(RemoteControlReceiver);
 am.unregisterMediaButtonEventReceiver(RemoteControlReceiver);
 ```
 一般来说，当app不活跃或者不可见的时候就该取消注册，比如在onStop里。但是，对于媒体播放的app没那么简单——实际上，反而当你app不可见的时候监听媒体键才是最重要的时候，因为它没法用屏幕上的UI来控制。所以较好的处理方法是你app获得/失去音频焦点的时候来注册/解除receiver。
-为了避免多个音乐app同时播放，android使用音频焦点来使音频播放符合标准。只有持有焦点的app才应该播放音乐。在你app开始播放之前，它应该申请并接受焦点。同样滴，它应该监听啥时候失去焦点然后做出相应的反应。
+为了避免多个音乐app同时播放，android使用音频焦点来使音频播放符合标准。只有持有焦点的app才应该播放音乐。在你app开始播放之前，它应该申请并接受焦点。同样，它应该监听啥时候失去焦点然后做出相应的反应。
 
 对app正在使用的流用`requestAudioFocus()`，如果返回`AUDIOFOCUS_REQUEST_GRANTED`就可以获得音频焦点了。无论你想获得的是短暂还是永久的焦点，你都必须指定你在用的流。如果播放短时间的音频，比如一个说明，就用临时焦点；如果在可预见的未来范围内播放音乐就申请永久焦点，比如播放音乐。你应该在准备播放前立刻申请焦点，比如用户按下播放或者游戏下一关开始的背景音乐：
 ```
@@ -941,7 +941,7 @@ if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
 }
 ```
 当你播放结束后，一定要`abandonAudioFocus()`。这会通知系统你不再需要焦点，并解除AudioManager.OnAudioFocusChangeListener的关联。临时焦点的弃用，会让任何被中断的app继续播放。`// Abandon audio focus when playback complete    am.abandonAudioFocus(afChangeListener);`
-当你申请临时焦点时，还可以额外选择是否开启"回避模式"(ducking)。通常，一个守规矩的(well-behaved)音频软件会在失去焦点时立刻静音他的播放。要求一个带回避模式的临时焦点，就意味着你告诉其他app，如果他们在焦点返回之前降低声音，还是可以继续播放滴。
+当你申请临时焦点时，还可以额外选择是否开启"回避模式"(ducking)。通常，一个守规矩的(well-behaved)音频软件会在失去焦点时立刻静音他的播放。要求一个带回避模式的临时焦点，就意味着你告诉其他app，如果他们在焦点返回之前降低声音，还是可以继续播放滴(注：也就是说你在播放的时候，其他app只要愿意降低音量就可以不暂停播放，在哪里降低音量？就是下面讲的OnAudioFocusChangeListener)。
 ```
 // Request audio focus for playback
 int result = am.requestAudioFocus(afChangeListener,
@@ -1354,7 +1354,7 @@ The last step is updating onPostExecute() in BitmapWorkerTask so that it checks 
     }
 }
 This implementation is now suitable for use in ListView and GridView components as well as any other components that recycle their child views. Simply call loadBitmap where you normally set an image to your ImageView. For example, in a GridView implementation this would be in the getView() method of the backing adapter.
-
+//TOCHECK
 加载单个bitmap到界面上是很简单的，但是如果你需要一次加载一大堆图片，就有点复杂了。许多情况下（比如用GridView或者ViewPager,RecyclerView）屏幕上的图片数和即将滚动到屏幕的图片理论上可以是无限的。这些组件通过当子views离开屏幕时对其进行回收，降低了内存的使用。GC还会在你没有保有长期引用时释放你加载的bitmap。一切都是那么棒棒哒(be all good and well)，但是为了保持流畅和快速加载UI，你要避免每次图片回到屏幕时都反复处理图片。那么内存和磁盘（内部存储）缓存就派上用场了，可以让控件快速重新加载、处理图片。（译者注：我们可以通过第三方加载图片库来达到这个目的，但是翻译这里是为了了解机制和思想）
 
 内存缓存(memory cache)以占据应用内存空间为代价，提供了对bitmap的快速访问。LruCache尤其适合缓存bitmap的任务，在一个LinkedHashMap中持有最近的引用对象，并在缓存超限之前释放了最少被使用的成员。注意，在以前，流行的内存缓存的实现是用弱引用或者软引用 bitmap cache，但这并不推荐。从android2.3GC对于弱引用和软引用的回收变得更剧烈(aggressive)，这让他们相当低效(faily ineffective)。3.0之前，bitmap数据的备份被存在本地内存且不会被可预期的方法释放，潜在地可能导致OOM。
