@@ -345,7 +345,7 @@ public static class MainActivity extends Activity
         }
     }
 }
-```S
+```
 
 你可以用下面的方法，创建一个SharedPreference文件或者获得已经存在的sp：
 - `getSharedPreferences()` 通过指定文件名，来获得相应的sp。你可以在app中的任何Context下使用该方法
