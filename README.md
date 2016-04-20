@@ -18,7 +18,7 @@
     1. [高效显示bitmap](#display-bitmaps-efficiently)
     2. [用Scenes和Transitions来使view动起来](#animating-views–using–scenes–and-transitions)
     3. [添加动画](#adding-animations)
-4. [网络连接](#connectivity-&-the-cloud)
+4. [网络连接](#connectivity-and-the-cloud)
 
 <!--1. [Transferring Data Without Draining the Battery](transferring–data–without–draining-the-battery)-->
     
