@@ -14,11 +14,11 @@
 2. [多媒体](#multimedia)
     1. [管理音频播放](#manage-audio-playback)
     2. [拍照](#capturing-photos)
-3. [图像 & 动画](#graphics-&-animation)
+3. [图像 & 动画](#display-bitmaps-efficiently)
     1. [高效显示bitmap](#display-bitmaps-efficiently)
     2. [用Scenes和Transitions来使view动起来](#animating-views–using–scenes–and-transitions)
     3. [添加动画](#adding-animations)
-4. [网络连接](#connectivity-and-the-cloud)
+4. [网络连接](#transferring-data-without-draining-the-battery)
 
 <!--1. [Transferring Data Without Draining the Battery](transferring–data–without–draining-the-battery)-->
     
