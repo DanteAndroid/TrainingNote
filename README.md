@@ -1354,17 +1354,17 @@ The last step is updating onPostExecute() in BitmapWorkerTask so that it checks 
     }
 }
 This implementation is now suitable for use in ListView and GridView components as well as any other components that recycle their child views. Simply call loadBitmap where you normally set an image to your ImageView. For example, in a GridView implementation this would be in the getView() method of the backing adapter.
-//TOCHECK
-加载单个bitmap到界面上是很简单的，但是如果你需要一次加载一大堆图片，就有点复杂了。许多情况下（比如用GridView或者ViewPager,RecyclerView）屏幕上的图片数和即将滚动到屏幕的图片理论上可以是无限的。这些组件通过当子views离开屏幕时对其进行回收，降低了内存的使用。GC还会在你没有保有长期引用时释放你加载的bitmap。一切都是那么棒棒哒(be all good and well)，但是为了保持流畅和快速加载UI，你要避免每次图片回到屏幕时都反复处理图片。那么内存和磁盘（内部存储）缓存就派上用场了，可以让控件快速重新加载、处理图片。（译者注：我们可以通过第三方加载图片库来达到这个目的，但是翻译这里是为了了解机制和思想）
 
-内存缓存(memory cache)以占据应用内存空间为代价，提供了对bitmap的快速访问。LruCache尤其适合缓存bitmap的任务，在一个LinkedHashMap中持有最近的引用对象，并在缓存超限之前释放了最少被使用的成员。注意，在以前，流行的内存缓存的实现是用弱引用或者软引用 bitmap cache，但这并不推荐。从android2.3GC对于弱引用和软引用的回收变得更剧烈(aggressive)，这让他们相当低效(faily ineffective)。3.0之前，bitmap数据的备份被存在本地内存且不会被可预期的方法释放，潜在地可能导致OOM。
+加载单个bitmap到界面上是很简单的，但是如果你需要一次加载一大堆图片，就有点复杂了。许多情况下（比如用GridView或者ViewPager,RecyclerView）屏幕上的图片数和即将滚动到屏幕的图片理论上可以是无限的。这些组件通过当子views离开屏幕时对其进行回收，降低了内存的使用。GC还会在你没有保有长期引用时释放你加载的bitmap。一切都是那么棒棒哒，但是为了保持流畅和快速加载UI，你要避免每次图片回到屏幕时都反复处理图片。那么内存和磁盘缓存就派上用场了，可以让控件快速重新加载、处理图片。（译者注：我们可以通过第三方加载图片库来达到这个目的，但是翻译这里是为了了解机制和思想）
+
+内存缓存以占据应用内存空间为代价，提供了对bitmap的快速访问。LruCache尤其适合缓存bitmap的任务，在一个LinkedHashMap中持有最近的引用对象，并在缓存超限之前释放了最少被使用的成员。注意，在以前，流行的内存缓存的实现是用弱引用或者软引用 bitmap cache，但这并不推荐。从android2.3GC对于弱引用和软引用的回收变得更剧烈，这让他们相当低效(faily ineffective)。3.0之前，bitmap数据的备份被存在本地内存且不会被可预期的方法释放，潜在地可能导致OOM。
 为了选择合适大小的LruCache，一些因素需要考虑：
 - 你的activity/application 剩余的内存有多密集(intentsive)？
 - 屏幕一次加载多少图片？有多少需要准备好以显示到屏幕上？
 - 设备屏幕尺寸和DPI是多大？一个xhdpi的设备相对于低dpi的设备会需要更大的缓存来在内存中hold相同数量的图片。
 - bitmaps的尺寸和配置是什么样的？每个bitmap会占据多大内存？
 - 图片会被访问多频繁？会不会有一些比其他的访问更频繁？如果是，也许你应该保持特定项在一直在内存里，或使用多个LruCache对象来应对不同组bitmaps。
-- 你能权衡质量和数量么(balance quality against quantity)？有时候存储大量低质量的bitmaps更有用，潜在地(potentially)在后台任务中再加载高质量的版本。
+- 你能权衡质量和数量么？有时候存储大量低质量的bitmaps更有用，潜在地(potentially)在后台任务中再加载高质量的版本。
 没有特定的尺寸或者公式能适配所有app，取决于你来分析使用情况并做出合适的方案。太小的cache可能导致毫无好处的额外开支(overhead)，太大的cache可能导致OOM，并让app所剩内存无几。示例：
 ```
 private LruCache<String, Bitmap> mMemoryCache;
@@ -1877,7 +1877,7 @@ public void captureEndValues(TransitionValues transitionValues) {
 
 ### Adding Animations
 
-动画添加了细微的视觉线索，可以通知用户你app是啥情况并且提高对你app界面的认知(mental model of your app's inteerface)。动画在屏幕状态改变时尤其有用，比如加载内容或者新操作可用时。动画还能增加你app的颜值，给你app一种高大上的赶脚(a higher quality feel)。请记住，过度使用动画或者不合时宜地使用都可能是有害的，比如他们可用造成延迟。
+动画添加了细微的视觉线索，可以通知用户你app是啥情况并且提高对你app界面的认知。动画在屏幕状态改变时尤其有用，比如加载内容或者新操作可用时。动画还能增加你app的颜值，给你app一种高大上的赶脚。请记住，过度使用动画或者不合时宜地使用都可能是有害的，比如他们可用造成延迟。
 
 淡入淡出（crossfading）动画（又叫溶解dissolve）逐渐地淡出一个UI控件，同步地(simultaneously)淡入另外一个控件。这个动画在你想切换内容或者views时很实用。Crossfades非常细微、短暂，但是提供了从一个屏幕到下一个的流畅转换。不管怎么说，如果你不用它，转换就感觉很急促、突然。
 
