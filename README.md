@@ -1,9 +1,4 @@
 
-```
----Update 4.14---
-Building apps部分翻译完成，下一步：润色
-```
-
 本文用尽可能通俗且准确的语言翻译了我认为[Training文档](http://developer.android.com/intl/en/training)中较重要的部分。
 其他不常用或者依据业务需求而不同的部分（如蓝牙，高级动画）暂不做翻译。
 注意，本人无论是英语和技术水平都很有限，如有瑕疵请不要犹豫，告诉我你的想法。
@@ -2711,4 +2706,4 @@ switch (activeNetwork.getType()) {
 
 ---
 
-以上是Building apps部分，还有重要的Best practice部分我会在另一篇文章中写完。
+以上是Building apps部分，还有重要的[Best practice](BEST_PRACTICE.md)部分未完成。
