@@ -16,7 +16,7 @@
     2. [拍照](#capturing-photos)
 3. [图像 & 动画](#display-bitmaps-efficiently)
     1. [高效显示bitmap](#display-bitmaps-efficiently)
-    2. [用Scenes和Transitions来使view动起来](#animating-views–using–scenes–and-transitions)
+    2. [用Scenes和Transitions来使view动起来](#animating-views-using-scenes-and-transitions)
     3. [添加动画](#adding-animations)
 4. [网络连接](#transferring-data-without-draining-the-battery)
 
