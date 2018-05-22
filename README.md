@@ -834,7 +834,7 @@ void handleSendMultipleImages(Intent intent) {
     }
 ```
 
-###Sharing Files：
+### Sharing Files：
 
 为了安全地从分享文件给其他app，你得给文件配置一个安全的处理方法，以一个内容URI的形式。android的FileProvicer组件为文件生成了内容URI，基于你在XML文件中的详细定义。
 为你app定义FileProvider需要在manifest中定义一个入口(entry)，这个入口包含生成内容URI的授权信息，和XML的文件名（这个XML指定了你app能分享的目录）：
