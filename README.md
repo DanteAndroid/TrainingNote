@@ -23,9 +23,9 @@
 <!--1. [Transferring Data Without Draining the Battery](transferring–data–without–draining-the-battery)-->
     
 ---
-##Getting started
+## Getting started
 
-###Supporting Different Screens
+### Supporting Different Screens
 
 系统会自动缩放你的布局以适应屏幕。也就是说，为了支持不同的屏幕(以下都称为适配)的时候，你不需要担心布局中控件的绝对尺寸，而要关注会影响用户体验的布局结构
 ，比如重要控件相对于sibling views(兄弟view)的位置，尺寸。一个包含默认布局和为大屏幕适配的布局示例：
@@ -48,7 +48,7 @@
 
 ***
 
-###Managing the Activity Lifecycle
+### Managing the Activity Lifecycle
 
 Activity只能在三种状态下停留较长(extended period)时间：
 - Resumed ————Activity在前台，用户可以交互，又叫做运行状态。
@@ -184,7 +184,7 @@ protected void onCreate(Bundle savedInstanceState) {
 
 ***
 
-###Building a Dynamic UI with Fragments
+### Building a Dynamic UI with Fragments
 
 为了创建动态的、多面板的UI，你需要封装UI控件和activity行为成模块，这样可以包进你的activity(swap into and out of your activities)。
 你可以用Fragment类来创建这些模块，它就像一个嵌套的activity一样。你可以把Fragment看做模块化的activity。有自己的布局、生命周期、输入事件，还能在activity运行时动态添加、移除。（有点像你可以在不同activity中复用的子activity）
@@ -444,7 +444,7 @@ public File getAlbumStorageDir(Context context, String albumName) {
 
 ---
 
-###Interacting with Other Apps
+### Interacting with Other Apps
 
 通常你会用显示intent来在activity间切换，它定义了你想启动的组件的类名。但是，如果你
 需要进行独立于app之外的操作，比如查看地图，你得用隐式intent。它不指定类名而是声明了一个action。
